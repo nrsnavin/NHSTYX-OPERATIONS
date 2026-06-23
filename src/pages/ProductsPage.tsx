@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Card, Input, Table, Tag, Tooltip, Typography } from 'antd';
+import { Alert, Card, Input, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { Link } from 'react-router-dom';
 import { useProducts } from '../api/products.api';
-import { formatPaise } from '../lib/money';
 import type { Product } from '../types';
 
 export function ProductsPage() {
@@ -31,35 +31,15 @@ export function ProductsPage() {
       render: (unit: string) => <Tag>{unit}</Tag>,
     },
     {
-      title: 'Price (excl. GST)',
-      key: 'price',
-      render: (_, record) => {
-        const tiers = record.priceTiers ?? [];
-        return (
-          <div>
-            <div style={{ fontWeight: 600 }}>{formatPaise(record.pricePaise)}</div>
-            {tiers.length > 0 && (
-              <Tooltip
-                title={tiers
-                  .map((t) => `${t.minQty}+ → ${formatPaise(t.pricePaise)}`)
-                  .join('  ·  ')}
-              >
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {tiers.length} tier{tiers.length > 1 ? 's' : ''}
-                </Typography.Text>
-              </Tooltip>
-            )}
-          </div>
-        );
-      },
-    },
-    {
       title: 'GST',
       dataIndex: 'gstRatePercent',
       key: 'gst',
       render: (gst: number, record) => (
         <span>
-          {gst}%{record.hsnCode ? <Typography.Text type="secondary"> · HSN {record.hsnCode}</Typography.Text> : null}
+          {gst}%
+          {record.hsnCode ? (
+            <Typography.Text type="secondary"> · HSN {record.hsnCode}</Typography.Text>
+          ) : null}
         </span>
       ),
     },
@@ -69,11 +49,16 @@ export function ProductsPage() {
       key: 'moq',
     },
     {
-      title: 'Stock',
-      dataIndex: 'stockQty',
-      key: 'stock',
-      render: (stock: number) =>
-        stock > 0 ? stock : <Tag color="red">Out of stock</Tag>,
+      title: 'Stocked in',
+      key: 'stores',
+      render: (_, record) => {
+        const n = record._count?.storeProducts ?? 0;
+        return n > 0 ? (
+          <Tag color="blue">{n} store{n > 1 ? 's' : ''}</Tag>
+        ) : (
+          <Tag>Not stocked</Tag>
+        );
+      },
     },
     {
       title: 'Status',
@@ -86,7 +71,7 @@ export function ProductsPage() {
 
   return (
     <Card
-      title="Products"
+      title="Catalog"
       extra={
         <Input.Search
           placeholder="Search products…"
@@ -99,6 +84,13 @@ export function ProductsPage() {
         />
       }
     >
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginBottom: 16 }}
+        message="Price and stock are managed per store."
+        description={<>Set a product's price, stock and quantity tiers for each store under <Link to="/stores">Stores → Manage → Inventory</Link>.</>}
+      />
       <Table<Product>
         rowKey="id"
         loading={isLoading}

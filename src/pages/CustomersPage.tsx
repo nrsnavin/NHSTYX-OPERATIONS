@@ -24,6 +24,12 @@ export function CustomersPage() {
     },
     { title: 'Phone', dataIndex: 'phone', key: 'phone' },
     {
+      title: 'Store',
+      key: 'store',
+      render: (_, record) =>
+        record.store ? <Tag color="blue">{record.store.city}</Tag> : <Tag>Unassigned</Tag>,
+    },
+    {
       title: 'GSTIN',
       dataIndex: 'gstin',
       key: 'gstin',

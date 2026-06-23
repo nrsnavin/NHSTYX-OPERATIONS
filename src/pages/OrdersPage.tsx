@@ -59,6 +59,12 @@ export function OrdersPage() {
         ),
     },
     {
+      title: 'Store',
+      key: 'store',
+      render: (_, record) =>
+        record.store ? <Tag color="blue">{record.store.city}</Tag> : <Typography.Text type="secondary">—</Typography.Text>,
+    },
+    {
       title: 'Items',
       key: 'items',
       render: (_, record) => record.items?.length ?? 0,

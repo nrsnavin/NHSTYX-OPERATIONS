@@ -5,6 +5,7 @@ import {
   AppstoreOutlined,
   DashboardOutlined,
   LogoutOutlined,
+  ShopOutlined,
   ShoppingCartOutlined,
   TeamOutlined,
   UserOutlined,
@@ -24,7 +25,8 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { key: '/', label: 'Dashboard', icon: <DashboardOutlined />, roles: ['ADMIN', 'AGENT'] },
-  { key: '/products', label: 'Products', icon: <AppstoreOutlined />, roles: ['ADMIN', 'AGENT'] },
+  { key: '/products', label: 'Catalog', icon: <AppstoreOutlined />, roles: ['ADMIN', 'AGENT'] },
+  { key: '/stores', label: 'Stores', icon: <ShopOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/orders', label: 'Orders', icon: <ShoppingCartOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/customers', label: 'Customers', icon: <TeamOutlined />, roles: ['ADMIN', 'AGENT'] },
 ];

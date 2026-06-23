@@ -35,11 +35,11 @@ export interface PaginatedResponse<T> {
 export type ProductUnit = 'PIECE' | 'DOZEN' | 'PACK' | 'BOX' | 'SET' | 'KILOGRAM' | 'METER';
 
 export interface PriceTier {
-  id: string;
   minQty: number;
   pricePaise: number;
 }
 
+/** Shared catalog product. Price & stock are per-store (see StoreInventoryItem). */
 export interface Product {
   id: string;
   name: string;
@@ -48,13 +48,71 @@ export interface Product {
   hsnCode?: string | null;
   gstRatePercent: number;
   mrpPaise?: number | null;
-  pricePaise: number;
   moqQty: number;
-  stockQty: number;
   isActive: boolean;
   category?: { id: string; name: string };
-  priceTiers: PriceTier[];
+  _count?: { storeProducts: number };
   createdAt: string;
+}
+
+export interface StoreSummary {
+  id: string;
+  name: string;
+  city: string;
+  code?: string;
+}
+
+export interface ServiceArea {
+  id: string;
+  city: string;
+  label: string;
+  storeId: string;
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  code: string;
+  phone?: string | null;
+  addressLine?: string | null;
+  city: string;
+  state: string;
+  stateCode: string;
+  pincode?: string | null;
+  isActive: boolean;
+  serviceAreas: ServiceArea[];
+  _count?: { agents: number; customers: number; inventory: number };
+  createdAt: string;
+}
+
+export interface Agent {
+  id: string;
+  name: string;
+  email: string;
+  isActive: boolean;
+  storeId?: string | null;
+  store?: StoreSummary | null;
+}
+
+/** A catalog product with this store's price/stock attached (null = not stocked). */
+export interface StoreInventoryItem {
+  productId: string;
+  name: string;
+  brand?: string | null;
+  unit: ProductUnit;
+  gstRatePercent: number;
+  moqQty: number;
+  mrpPaise?: number | null;
+  imageUrl?: string | null;
+  categoryName?: string | null;
+  stocked: boolean;
+  storeProduct: {
+    pricePaise: number;
+    mrpPaise?: number | null;
+    stockQty: number;
+    isActive: boolean;
+    priceTiers: PriceTier[];
+  } | null;
 }
 
 export type OrderStatus =
@@ -91,6 +149,7 @@ export interface Order {
   totalPaise: number;
   amountDuePaise: number;
   customer?: { shopName: string; phone: string };
+  store?: StoreSummary | null;
   items: OrderItem[];
   createdAt: string;
 }
@@ -106,5 +165,7 @@ export interface Customer {
   creditDays: number;
   isActive: boolean;
   createdAt: string;
+  storeId?: string | null;
+  store?: StoreSummary | null;
   _count?: { orders: number };
 }
