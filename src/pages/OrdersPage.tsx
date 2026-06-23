@@ -1,23 +1,23 @@
 import { useState } from 'react';
-import { Card, Select, Table, Tag, Typography } from 'antd';
+import { Card, Select, Space, Table, Tag, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { useOrders, useUpdateOrderStatus } from '../api/orders.api';
-import type { Order, OrderStatus } from '../types';
+import { formatPaise } from '../lib/money';
+import type { Order, OrderPaymentStatus, OrderStatus } from '../types';
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
-  DRAFT: 'default',
-  PLACED: 'blue',
-  CONFIRMED: 'cyan',
+  PENDING: 'gold',
+  CONFIRMED: 'blue',
   PACKED: 'geekblue',
   SHIPPED: 'purple',
   DELIVERED: 'green',
   CANCELLED: 'red',
-  RETURNED: 'orange',
+  RETURNED: 'volcano',
 };
 
 const STATUS_OPTIONS: OrderStatus[] = [
-  'PLACED',
+  'PENDING',
   'CONFIRMED',
   'PACKED',
   'SHIPPED',
@@ -25,6 +25,13 @@ const STATUS_OPTIONS: OrderStatus[] = [
   'CANCELLED',
   'RETURNED',
 ];
+
+const PAYMENT_COLORS: Record<OrderPaymentStatus, string> = {
+  UNPAID: 'red',
+  PARTIALLY_PAID: 'orange',
+  PAID: 'green',
+  REFUNDED: 'default',
+};
 
 export function OrdersPage() {
   const [page, setPage] = useState(1);
@@ -41,7 +48,15 @@ export function OrdersPage() {
     {
       title: 'Customer',
       key: 'customer',
-      render: (_, record) => record.customer?.businessName ?? '—',
+      render: (_, record) =>
+        record.customer ? (
+          <div>
+            <div>{record.customer.shopName}</div>
+            <Typography.Text type="secondary">{record.customer.phone}</Typography.Text>
+          </div>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Items',
@@ -50,9 +65,22 @@ export function OrdersPage() {
     },
     {
       title: 'Total',
-      dataIndex: 'total',
+      dataIndex: 'totalPaise',
       key: 'total',
-      render: (total: string) => `₹${Number(total).toFixed(2)}`,
+      render: (totalPaise: number) => formatPaise(totalPaise),
+    },
+    {
+      title: 'Payment',
+      key: 'payment',
+      render: (_, record) => (
+        <Space direction="vertical" size={0}>
+          <Tag color={PAYMENT_COLORS[record.paymentStatus]}>{record.paymentStatus}</Tag>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {record.paymentMethod}
+            {record.amountDuePaise > 0 ? ` · due ${formatPaise(record.amountDuePaise)}` : ''}
+          </Typography.Text>
+        </Space>
+      ),
     },
     {
       title: 'Placed',

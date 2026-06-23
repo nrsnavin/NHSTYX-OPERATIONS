@@ -23,10 +23,6 @@ export function LoginPage() {
     setError(null);
     try {
       const result = await login(values.email, values.password);
-      if (result.user.role === 'CUSTOMER') {
-        setError('This console is for staff (Admin/Agent) accounts only.');
-        return;
-      }
       setAuth(result);
       navigate(from, { replace: true });
     } catch {

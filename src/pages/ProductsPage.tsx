@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Card, Input, Table, Tag, Typography } from 'antd';
+import { Card, Input, Table, Tag, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useProducts } from '../api/products.api';
+import { formatPaise } from '../lib/money';
 import type { Product } from '../types';
 
 export function ProductsPage() {
@@ -17,34 +18,62 @@ export function ProductsPage() {
       render: (name: string, record) => (
         <div>
           <div style={{ fontWeight: 600 }}>{name}</div>
-          <Typography.Text type="secondary">{record.brand ?? '—'}</Typography.Text>
+          <Typography.Text type="secondary">
+            {record.brand ?? '—'} · {record.category?.name ?? '—'}
+          </Typography.Text>
         </div>
       ),
     },
     {
-      title: 'Category',
-      key: 'category',
-      render: (_, record) => record.category?.name ?? '—',
+      title: 'Unit',
+      dataIndex: 'unit',
+      key: 'unit',
+      render: (unit: string) => <Tag>{unit}</Tag>,
     },
     {
-      title: 'Variants',
-      key: 'variants',
-      render: (_, record) => record.variants.length,
-    },
-    {
-      title: 'From price',
+      title: 'Price (excl. GST)',
       key: 'price',
       render: (_, record) => {
-        const prices = record.variants.map((v) => Number(v.price));
-        const min = prices.length ? Math.min(...prices) : 0;
-        return `₹${min.toFixed(2)}`;
+        const tiers = record.priceTiers ?? [];
+        return (
+          <div>
+            <div style={{ fontWeight: 600 }}>{formatPaise(record.pricePaise)}</div>
+            {tiers.length > 0 && (
+              <Tooltip
+                title={tiers
+                  .map((t) => `${t.minQty}+ → ${formatPaise(t.pricePaise)}`)
+                  .join('  ·  ')}
+              >
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {tiers.length} tier{tiers.length > 1 ? 's' : ''}
+                </Typography.Text>
+              </Tooltip>
+            )}
+          </div>
+        );
       },
     },
     {
-      title: 'In stock',
+      title: 'GST',
+      dataIndex: 'gstRatePercent',
+      key: 'gst',
+      render: (gst: number, record) => (
+        <span>
+          {gst}%{record.hsnCode ? <Typography.Text type="secondary"> · HSN {record.hsnCode}</Typography.Text> : null}
+        </span>
+      ),
+    },
+    {
+      title: 'MOQ',
+      dataIndex: 'moqQty',
+      key: 'moq',
+    },
+    {
+      title: 'Stock',
+      dataIndex: 'stockQty',
       key: 'stock',
-      render: (_, record) =>
-        record.variants.reduce((sum, v) => sum + v.stockQuantity, 0),
+      render: (stock: number) =>
+        stock > 0 ? stock : <Tag color="red">Out of stock</Tag>,
     },
     {
       title: 'Status',

@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import { useAuthStore } from '../store/auth.store';
 import { logout as apiLogout } from '../api/auth.api';
-import type { UserRole } from '../types';
+import type { Role } from '../types';
 
 const { Header, Sider, Content } = Layout;
 
@@ -19,7 +19,7 @@ interface NavItem {
   key: string;
   label: string;
   icon: React.ReactNode;
-  roles: UserRole[];
+  roles: Role[];
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -33,7 +33,7 @@ export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, refreshToken, clear } = useAuthStore();
+  const { user, clear } = useAuthStore();
   const {
     token: { colorBgContainer },
   } = theme.useToken();
@@ -50,7 +50,7 @@ export function DashboardLayout() {
 
   const handleLogout = async () => {
     try {
-      if (refreshToken) await apiLogout(refreshToken);
+      await apiLogout();
     } catch {
       // ignore — clear client state regardless
     } finally {
@@ -109,7 +109,7 @@ export function DashboardLayout() {
             <span style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
               <Avatar icon={<UserOutlined />} />
               <span>
-                {user?.fullName ?? user?.email}{' '}
+                {user?.name ?? user?.email}{' '}
                 <Typography.Text type="secondary">({user?.role})</Typography.Text>
               </span>
             </span>

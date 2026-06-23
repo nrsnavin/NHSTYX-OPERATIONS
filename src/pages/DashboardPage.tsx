@@ -12,11 +12,11 @@ export function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const products = useProducts({ limit: 1 });
   const orders = useOrders({ limit: 1 });
-  const pendingOrders = useOrders({ limit: 1, status: 'PLACED' });
+  const pendingOrders = useOrders({ limit: 1, status: 'PENDING' });
 
   return (
     <div>
-      <Typography.Title level={3}>Welcome back, {user?.fullName ?? 'there'} 👋</Typography.Title>
+      <Typography.Title level={3}>Welcome back, {user?.name ?? 'there'} 👋</Typography.Title>
       <Typography.Paragraph type="secondary">
         Here&apos;s a quick snapshot of the NH Styx marketplace.
       </Typography.Paragraph>
