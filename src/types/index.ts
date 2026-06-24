@@ -174,6 +174,41 @@ export interface Order {
 
 export type CustomerStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+export type LeadStage = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST';
+export type LeadSource = 'MANUAL' | 'SIGNUP';
+export type ActivityType = 'NOTE' | 'CALL' | 'VISIT' | 'EMAIL';
+
+export interface Activity {
+  id: string;
+  type: ActivityType;
+  body: string;
+  followUpAt?: string | null;
+  createdBy?: { id: string; name: string } | null;
+  createdAt: string;
+}
+
+export interface Lead {
+  id: string;
+  shopName: string;
+  contactName?: string | null;
+  phone: string;
+  email?: string | null;
+  city?: string | null;
+  stage: LeadStage;
+  source: LeadSource;
+  estValuePaise: number;
+  nextFollowUpAt?: string | null;
+  lostReason?: string | null;
+  store?: StoreSummary | null;
+  assignedTo?: { id: string; name: string } | null;
+  customer?: { id: string; status: CustomerStatus } | null;
+  customerId?: string | null;
+  activities?: Activity[];
+  _count?: { activities: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Customer {
   id: string;
   shopName: string;

@@ -4,6 +4,7 @@ import { Avatar, Dropdown, Layout, Menu, theme, Typography } from 'antd';
 import {
   AppstoreOutlined,
   DashboardOutlined,
+  FunnelPlotOutlined,
   LogoutOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
@@ -28,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/products', label: 'Catalog', icon: <AppstoreOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/stores', label: 'Stores', icon: <ShopOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/orders', label: 'Orders', icon: <ShoppingCartOutlined />, roles: ['ADMIN', 'AGENT'] },
+  { key: '/leads', label: 'Leads', icon: <FunnelPlotOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/customers', label: 'Customers', icon: <TeamOutlined />, roles: ['ADMIN', 'AGENT'] },
 ];
 

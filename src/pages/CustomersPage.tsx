@@ -2,6 +2,8 @@ import { useState } from 'react';
 import {
   Button,
   Card,
+  Drawer,
+  Empty,
   Form,
   Input,
   InputNumber,
@@ -12,17 +14,20 @@ import {
   Switch,
   Table,
   Tag,
+  Timeline,
   Typography,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useQueryClient } from '@tanstack/react-query';
+import dayjs from 'dayjs';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   approveCustomer,
   rejectCustomer,
   updateCustomer,
   useCustomers,
 } from '../api/customers.api';
+import { addActivity, fetchActivities } from '../api/crm.api';
 import { formatPaise } from '../lib/money';
 import type { Customer, CustomerStatus } from '../types';
 
@@ -43,6 +48,7 @@ export function CustomersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CustomerStatus | undefined>(undefined);
+  const [notesFor, setNotesFor] = useState<Customer | null>(null);
   const { data, isLoading } = useCustomers({
     page,
     limit: 10,
@@ -141,31 +147,37 @@ export function CustomersPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_, r) =>
-        r.status === 'PENDING' ? (
-          <Space>
-            <Button type="primary" size="small" onClick={() => openApprove(r)}>
-              Approve
-            </Button>
-            <Popconfirm
-              title="Reject this registration?"
-              description="The shop won't be able to sign in."
-              onConfirm={() => doReject(r)}
-              okText="Reject"
-              okButtonProps={{ danger: true }}
-            >
-              <Button size="small" danger>
-                Reject
+      render: (_, r) => (
+        <Space>
+          {r.status === 'PENDING' ? (
+            <>
+              <Button type="primary" size="small" onClick={() => openApprove(r)}>
+                Approve
               </Button>
-            </Popconfirm>
-          </Space>
-        ) : r.status === 'APPROVED' ? (
-          <Button size="small" onClick={() => openApprove(r)}>
-            {r.creditApproved ? 'Edit credit' : 'Grant credit'}
+              <Popconfirm
+                title="Reject this registration?"
+                description="The shop won't be able to sign in."
+                onConfirm={() => doReject(r)}
+                okText="Reject"
+                okButtonProps={{ danger: true }}
+              >
+                <Button size="small" danger>
+                  Reject
+                </Button>
+              </Popconfirm>
+            </>
+          ) : r.status === 'APPROVED' ? (
+            <Button size="small" onClick={() => openApprove(r)}>
+              {r.creditApproved ? 'Edit credit' : 'Grant credit'}
+            </Button>
+          ) : (
+            <Typography.Text type="secondary">{r.rejectionReason ?? 'Rejected'}</Typography.Text>
+          )}
+          <Button size="small" type="link" onClick={() => setNotesFor(r)}>
+            Notes
           </Button>
-        ) : (
-          <Typography.Text type="secondary">{r.rejectionReason ?? 'Rejected'}</Typography.Text>
-        ),
+        </Space>
+      ),
     },
   ];
 
@@ -258,6 +270,67 @@ export function CustomersPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <CustomerNotesDrawer customer={notesFor} onClose={() => setNotesFor(null)} />
     </Card>
+  );
+}
+
+function CustomerNotesDrawer({ customer, onClose }: { customer: Customer | null; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [body, setBody] = useState('');
+  const { data: activities, isLoading } = useQuery({
+    queryKey: ['activities', 'customer', customer?.id],
+    queryFn: () => fetchActivities({ customerId: customer!.id }),
+    enabled: Boolean(customer),
+  });
+
+  const add = async () => {
+    if (!customer || !body.trim()) return;
+    try {
+      await addActivity({ type: 'NOTE', body: body.trim(), customerId: customer.id });
+      setBody('');
+      qc.invalidateQueries({ queryKey: ['activities', 'customer', customer.id] });
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed');
+    }
+  };
+
+  return (
+    <Drawer
+      title={customer ? `Notes · ${customer.shopName}` : 'Notes'}
+      width={480}
+      open={Boolean(customer)}
+      onClose={onClose}
+    >
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Input.TextArea
+          rows={3}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Add a note about this customer…"
+        />
+        <Button type="primary" onClick={add} disabled={!body.trim()}>
+          Add note
+        </Button>
+        {isLoading ? null : !activities?.length ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No notes yet" />
+        ) : (
+          <Timeline
+            items={activities.map((a) => ({
+              children: (
+                <div>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {dayjs(a.createdAt).format('DD MMM, HH:mm')}
+                    {a.createdBy ? ` · ${a.createdBy.name}` : ''}
+                  </Typography.Text>
+                  <div>{a.body}</div>
+                </div>
+              ),
+            }))}
+          />
+        )}
+      </Space>
+    </Drawer>
   );
 }
