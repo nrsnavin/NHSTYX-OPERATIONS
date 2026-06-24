@@ -17,6 +17,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import {
+  openInvoice,
   useOrder,
   useOrders,
   useRecordPayment,
@@ -204,6 +205,17 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
       open={Boolean(id)}
       onClose={onClose}
       loading={isLoading}
+      extra={
+        order ? (
+          <Button
+            onClick={() =>
+              openInvoice(order.id).catch((e) => message.error((e as Error).message ?? 'Failed'))
+            }
+          >
+            Invoice (PDF)
+          </Button>
+        ) : null
+      }
     >
       {order && (
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>

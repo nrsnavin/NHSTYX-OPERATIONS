@@ -34,6 +34,14 @@ export async function fetchOrder(id: string): Promise<Order> {
   return data.data;
 }
 
+/** Fetches the GST invoice PDF (with auth) and opens it in a new tab. */
+export async function openInvoice(id: string): Promise<void> {
+  const res = await api.get(`/orders/${id}/invoice`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data as Blob);
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 export function useOrder(id: string | null) {
   return useQuery({
     queryKey: ['order', id],
