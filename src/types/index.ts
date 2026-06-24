@@ -154,6 +154,8 @@ export interface Order {
   createdAt: string;
 }
 
+export type CustomerStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
 export interface Customer {
   id: string;
   shopName: string;
@@ -161,9 +163,13 @@ export interface Customer {
   phone: string;
   email?: string | null;
   gstin?: string | null;
+  status: CustomerStatus;
+  creditApproved: boolean;
   creditLimitPaise: number;
   creditDays: number;
   isActive: boolean;
+  approvedAt?: string | null;
+  rejectionReason?: string | null;
   createdAt: string;
   storeId?: string | null;
   store?: StoreSummary | null;
