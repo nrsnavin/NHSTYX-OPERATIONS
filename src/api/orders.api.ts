@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './axios';
-import type { Order, OrderStatus, PaginatedResponse } from '../types';
+import type { ApiEnvelope, Order, OrderStatus, PaginatedResponse, PaymentMethod } from '../types';
 
 interface OrderQuery {
   page?: number;
@@ -26,5 +26,36 @@ export function useUpdateOrderStatus() {
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
       api.patch(`/orders/${id}/status`, { status }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['orders'] }),
+  });
+}
+
+export async function fetchOrder(id: string): Promise<Order> {
+  const { data } = await api.get<ApiEnvelope<Order>>(`/orders/${id}`);
+  return data.data;
+}
+
+export function useOrder(id: string | null) {
+  return useQuery({
+    queryKey: ['order', id],
+    queryFn: () => fetchOrder(id as string),
+    enabled: Boolean(id),
+  });
+}
+
+/** Records a verified payment (e.g. a confirmed bank transfer) — marks it PAID
+ *  and auto-confirms the order. */
+export function useRecordPayment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; method: PaymentMethod; amountPaise: number; reference?: string }) =>
+      api.post(`/orders/${input.id}/payments`, {
+        method: input.method,
+        amountPaise: input.amountPaise,
+        reference: input.reference,
+      }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['order', v.id] });
+    },
   });
 }

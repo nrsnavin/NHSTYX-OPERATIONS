@@ -43,13 +43,16 @@ export interface PriceTier {
 export interface Product {
   id: string;
   name: string;
+  description?: string | null;
   brand?: string | null;
   unit: ProductUnit;
   hsnCode?: string | null;
   gstRatePercent: number;
   mrpPaise?: number | null;
   moqQty: number;
+  imageUrl?: string | null;
   isActive: boolean;
+  categoryId?: string;
   category?: { id: string; name: string };
   _count?: { storeProducts: number };
   createdAt: string;
@@ -136,6 +139,20 @@ export interface OrderItem {
   lineTotalPaise: number;
 }
 
+export type PaymentState = 'CREATED' | 'PAID' | 'FAILED' | 'REFUNDED';
+
+export interface Payment {
+  id: string;
+  method: PaymentMethod;
+  amountPaise: number;
+  status: PaymentState;
+  reference?: string | null;
+  note?: string | null;
+  razorpayPaymentId?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -148,9 +165,10 @@ export interface Order {
   igstPaise: number;
   totalPaise: number;
   amountDuePaise: number;
-  customer?: { shopName: string; phone: string };
+  customer?: { shopName: string; phone: string; gstin?: string | null };
   store?: StoreSummary | null;
   items: OrderItem[];
+  payments?: Payment[];
   createdAt: string;
 }
 
