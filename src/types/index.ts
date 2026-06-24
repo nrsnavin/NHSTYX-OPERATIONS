@@ -19,6 +19,18 @@ export interface ApiEnvelope<T> {
   message?: string;
 }
 
+export interface StaffUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: Role;
+  isActive: boolean;
+  storeId?: string | null;
+  store?: { id: string; name: string; city: string; code?: string } | null;
+  createdAt: string;
+}
+
 export interface Pagination {
   page: number;
   limit: number;

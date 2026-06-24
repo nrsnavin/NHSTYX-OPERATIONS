@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/orders', label: 'Orders', icon: <ShoppingCartOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/leads', label: 'Leads', icon: <FunnelPlotOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/customers', label: 'Customers', icon: <TeamOutlined />, roles: ['ADMIN', 'AGENT'] },
+  { key: '/staff', label: 'Staff', icon: <UserOutlined />, roles: ['ADMIN'] },
 ];
 
 export function DashboardLayout() {

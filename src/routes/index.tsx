@@ -8,6 +8,7 @@ import { StoresPage } from '../pages/StoresPage';
 import { LeadsPage } from '../pages/LeadsPage';
 import { OrdersPage } from '../pages/OrdersPage';
 import { CustomersPage } from '../pages/CustomersPage';
+import { StaffPage } from '../pages/StaffPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -24,6 +25,7 @@ export function AppRoutes() {
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/staff" element={<StaffPage />} />
         </Route>
       </Route>
 
