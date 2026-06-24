@@ -15,6 +15,7 @@ import {
   Table,
   Tag,
   Typography,
+  Upload,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
@@ -23,12 +24,14 @@ import {
   PlusOutlined,
   ShopOutlined,
   TeamOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   addServiceArea,
   assignAgent,
   createStore,
+  importInventory,
   removeServiceArea,
   removeStoreProduct,
   unassignAgent,
@@ -534,15 +537,51 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
       size="small"
       title="Inventory & pricing"
       extra={
-        <Input.Search
-          placeholder="Search products…"
-          allowClear
-          onSearch={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
-          style={{ width: 220 }}
-        />
+        <Space>
+          <Upload
+            showUploadList={false}
+            accept=".csv,text/csv"
+            beforeUpload={async (file) => {
+              try {
+                const r = await importInventory(store.id, file as File);
+                Modal.info({
+                  title: 'CSV import complete',
+                  content: (
+                    <div>
+                      <p>
+                        Created {r.created} · Updated {r.updated} · Skipped {r.skipped}
+                      </p>
+                      {r.errors.length > 0 && (
+                        <ul style={{ maxHeight: 160, overflow: 'auto', paddingLeft: 18 }}>
+                          {r.errors.map((e, i) => (
+                            <li key={i}>{e}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ),
+                });
+                refresh();
+              } catch (e) {
+                message.error((e as Error).message ?? 'Import failed');
+              }
+              return false;
+            }}
+          >
+            <Button size="small" icon={<UploadOutlined />}>
+              Import CSV
+            </Button>
+          </Upload>
+          <Input.Search
+            placeholder="Search products…"
+            allowClear
+            onSearch={(v) => {
+              setSearch(v);
+              setPage(1);
+            }}
+            style={{ width: 200 }}
+          />
+        </Space>
       }
     >
       <Table<StoreInventoryItem>

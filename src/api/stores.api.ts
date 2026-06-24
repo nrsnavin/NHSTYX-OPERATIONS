@@ -99,6 +99,24 @@ export async function removeStoreProduct(storeId: string, productId: string) {
   await api.delete(`/stores/${storeId}/inventory/${productId}`);
 }
 
+export interface ImportResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
+export async function importInventory(storeId: string, file: File): Promise<ImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await api.post<ApiEnvelope<ImportResult>>(
+    `/stores/${storeId}/inventory/import`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return data.data;
+}
+
 // ---- Agents ----
 
 export async function fetchAgents(): Promise<Agent[]> {
