@@ -134,13 +134,25 @@ export function OrdersPage() {
     },
     {
       title: '',
-      key: 'verify',
-      render: (_, record) =>
-        record.status === 'PENDING' ? (
-          <Button size="small" type="primary" ghost onClick={() => setSelected(record.id)}>
-            Verify
+      key: 'actions',
+      render: (_, record) => (
+        <Space size={4}>
+          {record.status === 'PENDING' && (
+            <Button size="small" type="primary" ghost onClick={() => setSelected(record.id)}>
+              Verify
+            </Button>
+          )}
+          <Button
+            size="small"
+            type="link"
+            onClick={() =>
+              openInvoice(record.id).catch((e) => message.error((e as Error).message ?? 'Failed'))
+            }
+          >
+            Invoice
           </Button>
-        ) : null,
+        </Space>
+      ),
     },
   ];
 
