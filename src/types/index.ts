@@ -182,7 +182,16 @@ export interface Order {
   store?: StoreSummary | null;
   items: OrderItem[];
   payments?: Payment[];
+  events?: OrderEvent[];
   createdAt: string;
+}
+
+export interface OrderEvent {
+  id: string;
+  status: OrderStatus;
+  note?: string | null;
+  createdAt: string;
+  user?: { name: string } | null;
 }
 
 export type CustomerStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

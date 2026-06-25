@@ -38,8 +38,10 @@ import {
   updateStore,
   upsertStoreProduct,
   useAgents,
+  useStockMovements,
   useStoreInventory,
   useStores,
+  type StockMovement,
   type StoreInput,
 } from '../api/stores.api';
 import { formatPaise } from '../lib/money';
@@ -261,6 +263,7 @@ function ManageStoreDrawer({
         <ServiceAreasCard store={store} isAdmin={isAdmin} onChanged={onChanged} />
         <AgentsCard store={store} isAdmin={isAdmin} onChanged={onChanged} />
         <InventoryCard store={store} onChanged={onChanged} />
+        <StockLedgerCard store={store} />
       </Space>
     </Drawer>
   );
@@ -661,6 +664,46 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
           </Form.List>
         </Form>
       </Modal>
+    </Card>
+  );
+}
+
+function StockLedgerCard({ store }: { store: Store }) {
+  const { data, isLoading } = useStockMovements(store.id, { limit: 30 });
+  const columns: ColumnsType<StockMovement> = [
+    {
+      title: 'When',
+      dataIndex: 'createdAt',
+      key: 'when',
+      render: (d: string) =>
+        new Date(d).toLocaleString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+    },
+    { title: 'Product', key: 'product', render: (_, m) => m.product?.name ?? '—' },
+    {
+      title: 'Change',
+      dataIndex: 'deltaQty',
+      key: 'delta',
+      render: (q: number) => <Tag color={q < 0 ? 'red' : 'green'}>{q > 0 ? `+${q}` : q}</Tag>,
+    },
+    { title: 'Type', dataIndex: 'type', key: 'type', render: (t: string) => <Tag>{t}</Tag> },
+    { title: 'Ref', key: 'ref', render: (_, m) => m.order?.orderNumber ?? m.reason ?? '—' },
+    { title: 'By', key: 'by', render: (_, m) => m.user?.name ?? 'system' },
+  ];
+  return (
+    <Card size="small" title="Stock ledger">
+      <Table<StockMovement>
+        rowKey="id"
+        size="small"
+        loading={isLoading}
+        columns={columns}
+        dataSource={data?.items ?? []}
+        pagination={{ pageSize: 8, size: 'small' }}
+      />
     </Card>
   );
 }

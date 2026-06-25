@@ -117,6 +117,41 @@ export async function importInventory(storeId: string, file: File): Promise<Impo
   return data.data;
 }
 
+// ---- Stock ledger ----
+
+export interface StockMovement {
+  id: string;
+  deltaQty: number;
+  type: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | 'RELEASE';
+  reason?: string | null;
+  createdAt: string;
+  product?: { id: string; name: string };
+  user?: { name: string } | null;
+  order?: { orderNumber: string } | null;
+}
+
+export async function fetchStockMovements(
+  storeId: string,
+  params: { productId?: string; page?: number; limit?: number } = {},
+): Promise<PaginatedResponse<StockMovement>> {
+  const { data } = await api.get<PaginatedResponse<StockMovement>>(
+    `/stores/${storeId}/movements`,
+    { params },
+  );
+  return data;
+}
+
+export function useStockMovements(
+  storeId: string | null,
+  params: { productId?: string; page?: number; limit?: number } = {},
+) {
+  return useQuery({
+    queryKey: ['store-movements', storeId, params],
+    queryFn: () => fetchStockMovements(storeId as string, params),
+    enabled: Boolean(storeId),
+  });
+}
+
 // ---- Agents ----
 
 export async function fetchAgents(): Promise<Agent[]> {

@@ -15,6 +15,7 @@ import {
   Space,
   Table,
   Tag,
+  Timeline,
   Typography,
   message,
 } from 'antd';
@@ -456,6 +457,31 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
               <Typography.Text strong>{formatPaise(order.totalPaise)}</Typography.Text>
             </Descriptions.Item>
           </Descriptions>
+
+          {order.events && order.events.length > 0 && (
+            <>
+              <Divider style={{ margin: '4px 0' }}>History</Divider>
+              <Timeline
+                items={order.events.map((e) => ({
+                  color:
+                    e.status === 'DELIVERED'
+                      ? 'green'
+                      : e.status === 'CANCELLED' || e.status === 'RETURNED'
+                        ? 'red'
+                        : 'blue',
+                  children: (
+                    <div>
+                      <Tag color={STATUS_COLORS[e.status]}>{e.status}</Tag>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {dayjs(e.createdAt).format('DD MMM, h:mm a')}
+                        {e.user ? ` · ${e.user.name}` : e.note ? ` · ${e.note}` : ''}
+                      </Typography.Text>
+                    </div>
+                  ),
+                }))}
+              />
+            </>
+          )}
         </Space>
       )}
     </Drawer>
