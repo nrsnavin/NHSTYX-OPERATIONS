@@ -34,6 +34,20 @@ export async function fetchOrder(id: string): Promise<Order> {
   return data.data;
 }
 
+export interface StaffOrderInput {
+  customerId: string;
+  paymentMethod: PaymentMethod;
+  items: { productId: string; quantity: number }[];
+  bankReference?: string;
+  notes?: string;
+}
+
+/** Places an order on behalf of a customer (phoned-in bulk order). */
+export async function createOrderForCustomer(input: StaffOrderInput): Promise<Order> {
+  const { data } = await api.post<ApiEnvelope<{ order: Order }>>('/orders/staff', input);
+  return data.data.order;
+}
+
 /** Fetches the GST invoice PDF (with auth) and opens it in a new tab. */
 export async function openInvoice(id: string): Promise<void> {
   const res = await api.get(`/orders/${id}/invoice`, { responseType: 'blob' });

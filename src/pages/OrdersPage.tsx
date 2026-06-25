@@ -6,6 +6,10 @@ import {
   Descriptions,
   Drawer,
   Divider,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
   Popconfirm,
   Select,
   Space,
@@ -15,16 +19,21 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
+  createOrderForCustomer,
   openInvoice,
   useOrder,
   useOrders,
   useRecordPayment,
   useUpdateOrderStatus,
 } from '../api/orders.api';
+import { useCustomers } from '../api/customers.api';
+import { useProducts } from '../api/products.api';
 import { formatPaise } from '../lib/money';
-import type { Order, OrderPaymentStatus, OrderStatus } from '../types';
+import type { Order, OrderPaymentStatus, OrderStatus, PaymentMethod } from '../types';
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
   PENDING: 'gold',
@@ -56,6 +65,7 @@ const PAYMENT_COLORS: Record<OrderPaymentStatus, string> = {
 export function OrdersPage() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const { data, isLoading } = useOrders({ page, limit: 10 });
   const updateStatus = useUpdateOrderStatus();
 
@@ -157,7 +167,14 @@ export function OrdersPage() {
   ];
 
   return (
-    <Card title="Orders">
+    <Card
+      title="Orders"
+      extra={
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreating(true)}>
+          New order for customer
+        </Button>
+      }
+    >
       <Table<Order>
         rowKey="id"
         loading={isLoading}
@@ -172,7 +189,140 @@ export function OrdersPage() {
         }}
       />
       <OrderDrawer id={selected} onClose={() => setSelected(null)} />
+      <CreateOrderModal open={creating} onClose={() => setCreating(false)} />
     </Card>
+  );
+}
+
+/** Agent/admin places an order on behalf of a customer (phoned-in bulk order). */
+function CreateOrderModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [form] = Form.useForm();
+  const [custSearch, setCustSearch] = useState('');
+  const [prodSearch, setProdSearch] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const { data: customers } = useCustomers({ status: 'APPROVED', search: custSearch || undefined, limit: 20 });
+  const { data: products } = useProducts({ search: prodSearch || undefined, limit: 30 });
+
+  const submit = async () => {
+    const v = await form.validateFields();
+    setSubmitting(true);
+    try {
+      const order = await createOrderForCustomer({
+        customerId: v.customerId,
+        paymentMethod: v.paymentMethod as PaymentMethod,
+        items: (v.items ?? []).map((it: { productId: string; quantity: number }) => ({
+          productId: it.productId,
+          quantity: it.quantity,
+        })),
+        bankReference: v.paymentMethod === 'BANK_TRANSFER' ? v.bankReference : undefined,
+        notes: v.notes,
+      });
+      message.success(`Order ${order.orderNumber} placed`);
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      form.resetFields();
+      onClose();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed to place order');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      title="New order for a customer"
+      open={open}
+      onOk={submit}
+      confirmLoading={submitting}
+      onCancel={onClose}
+      okText="Place order"
+      width={640}
+      destroyOnClose
+    >
+      <Form form={form} layout="vertical">
+        <Form.Item name="customerId" label="Customer" rules={[{ required: true }]}>
+          <Select
+            showSearch
+            filterOption={false}
+            onSearch={setCustSearch}
+            placeholder="Search shop name / phone"
+            options={(customers?.items ?? []).map((c) => ({
+              value: c.id,
+              label: `${c.shopName} · ${c.phone}${c.store ? ` · ${c.store.city}` : ''}`,
+            }))}
+          />
+        </Form.Item>
+
+        <div style={{ marginBottom: 8, fontWeight: 600 }}>Items</div>
+        <Form.List name="items" initialValue={[{}]}>
+          {(fields, { add, remove }) => (
+            <>
+              {fields.map((field) => (
+                <Space key={field.key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
+                  <Form.Item
+                    name={[field.name, 'productId']}
+                    rules={[{ required: true, message: 'Pick a product' }]}
+                    style={{ minWidth: 360 }}
+                  >
+                    <Select
+                      showSearch
+                      filterOption={false}
+                      onSearch={setProdSearch}
+                      placeholder="Search product"
+                      options={(products?.items ?? []).map((p) => ({
+                        value: p.id,
+                        label: `${p.name}${p.brand ? ` · ${p.brand}` : ''}`,
+                      }))}
+                    />
+                  </Form.Item>
+                  <Form.Item
+                    name={[field.name, 'quantity']}
+                    rules={[{ required: true, type: 'number', min: 1 }]}
+                  >
+                    <InputNumber min={1} placeholder="Qty" />
+                  </Form.Item>
+                  {fields.length > 1 && (
+                    <MinusCircleOutlined onClick={() => remove(field.name)} />
+                  )}
+                </Space>
+              ))}
+              <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} block>
+                Add item
+              </Button>
+            </>
+          )}
+        </Form.List>
+
+        <Form.Item name="paymentMethod" label="Payment" rules={[{ required: true }]} style={{ marginTop: 16 }}>
+          <Select
+            placeholder="Select payment method"
+            options={[
+              { value: 'RAZORPAY', label: 'Online (Razorpay) — customer pays later' },
+              { value: 'CREDIT', label: 'Credit (if approved)' },
+              { value: 'BANK_TRANSFER', label: 'Bank transfer' },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item noStyle shouldUpdate={(p, c) => p.paymentMethod !== c.paymentMethod}>
+          {() =>
+            form.getFieldValue('paymentMethod') === 'BANK_TRANSFER' ? (
+              <Form.Item name="bankReference" label="Bank transfer reference" rules={[{ required: true }]}>
+                <Input placeholder="UTR / txn id" />
+              </Form.Item>
+            ) : null
+          }
+        </Form.Item>
+        <Form.Item name="notes" label="Notes (optional)">
+          <Input.TextArea rows={2} />
+        </Form.Item>
+        <Alert
+          type="info"
+          showIcon
+          message="Online (Razorpay) orders are placed unpaid — the customer pays from the app's Orders screen."
+        />
+      </Form>
+    </Modal>
   );
 }
 
