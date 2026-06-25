@@ -31,7 +31,7 @@ import {
   useProducts,
   type ProductInput,
 } from '../api/products.api';
-import { createCategory, useCategoriesFlat } from '../api/categories.api';
+import { createCategory, useCategoryTree, type Category } from '../api/categories.api';
 import { useAuthStore } from '../store/auth.store';
 import type { Product, ProductUnit } from '../types';
 
@@ -41,7 +41,8 @@ const GST_SLABS = [0, 5, 12, 18, 28];
 interface FormValues {
   name: string;
   brand?: string;
-  categoryId: string;
+  parentCategoryId: string;
+  subCategoryId?: string;
   tags?: string[];
   unit: ProductUnit;
   hsnCode?: string;
@@ -62,7 +63,8 @@ export function ProductsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const { data, isLoading } = useProducts({ page, limit: 10, search: search || undefined });
-  const { data: categories } = useCategoriesFlat();
+  const { data: tree } = useCategoryTree();
+  const topLevel: Category[] = tree ?? [];
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -70,23 +72,49 @@ export function ProductsPage() {
   const [form] = Form.useForm<FormValues>();
   const refresh = () => qc.invalidateQueries({ queryKey: ['products'] });
 
-  // Inline "add category" from the product form's category dropdown.
+  // Inline "add category / sub-category" from the form's dropdowns.
   const [newCat, setNewCat] = useState('');
   const [addingCat, setAddingCat] = useState(false);
-  const addCategory = async () => {
+  const [newSub, setNewSub] = useState('');
+  const [addingSub, setAddingSub] = useState(false);
+  const refreshCats = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['categories-tree'] }),
+      qc.invalidateQueries({ queryKey: ['categories-flat'] }),
+    ]);
+
+  const addParentCategory = async () => {
     const name = newCat.trim();
     if (name.length < 2) return;
     setAddingCat(true);
     try {
       const created = await createCategory({ name });
-      await qc.invalidateQueries({ queryKey: ['categories-flat'] });
-      form.setFieldsValue({ categoryId: created.id } as Partial<FormValues>);
+      await refreshCats();
+      form.setFieldsValue({ parentCategoryId: created.id, subCategoryId: undefined } as Partial<FormValues>);
       setNewCat('');
       message.success(`Category "${created.name}" added`);
     } catch (err) {
       message.error((err as Error).message ?? 'Failed to add category');
     } finally {
       setAddingCat(false);
+    }
+  };
+
+  const addSubCategory = async () => {
+    const name = newSub.trim();
+    const parentId = form.getFieldValue('parentCategoryId') as string | undefined;
+    if (name.length < 2 || !parentId) return;
+    setAddingSub(true);
+    try {
+      const created = await createCategory({ name, parentId });
+      await refreshCats();
+      form.setFieldsValue({ subCategoryId: created.id } as Partial<FormValues>);
+      setNewSub('');
+      message.success(`Sub-category "${created.name}" added`);
+    } catch (err) {
+      message.error((err as Error).message ?? 'Failed to add sub-category');
+    } finally {
+      setAddingSub(false);
     }
   };
 
@@ -98,10 +126,23 @@ export function ProductsPage() {
   };
   const openEdit = (p: Product) => {
     setEditing(p);
+    // The product's category may be a top-level or a sub-category — split it
+    // back into parent + sub for the two selects.
+    const catId = p.category?.id ?? p.categoryId;
+    let parentCategoryId = catId;
+    let subCategoryId: string | undefined;
+    if (!topLevel.some((c) => c.id === catId)) {
+      const parent = topLevel.find((c) => (c.children ?? []).some((ch) => ch.id === catId));
+      if (parent) {
+        parentCategoryId = parent.id;
+        subCategoryId = catId;
+      }
+    }
     form.setFieldsValue({
       name: p.name,
       brand: p.brand ?? undefined,
-      categoryId: p.category?.id ?? p.categoryId,
+      parentCategoryId,
+      subCategoryId,
       tags: p.tags ?? [],
       unit: p.unit,
       hsnCode: p.hsnCode ?? undefined,
@@ -120,7 +161,8 @@ export function ProductsPage() {
     const payload: ProductInput = {
       name: v.name,
       brand: v.brand,
-      categoryId: v.categoryId,
+      // A product is filed under its sub-category when chosen, else the parent.
+      categoryId: v.subCategoryId || v.parentCategoryId,
       tags: v.tags ?? [],
       unit: v.unit,
       hsnCode: v.hsnCode,
@@ -327,16 +369,22 @@ export function ProductsPage() {
           <Form.Item name="name" label="Name" rules={[{ required: true, min: 2 }]}>
             <Input placeholder="Women's Cotton Kurti" />
           </Form.Item>
+          <Form.Item name="brand" label="Brand">
+            <Input placeholder="NH Basics" />
+          </Form.Item>
           <Space style={{ display: 'flex' }} align="start">
-            <Form.Item name="brand" label="Brand">
-              <Input placeholder="NH Basics" />
-            </Form.Item>
-            <Form.Item name="categoryId" label="Category" rules={[{ required: true }]} style={{ minWidth: 240 }}>
+            <Form.Item
+              name="parentCategoryId"
+              label="Category"
+              rules={[{ required: true }]}
+              style={{ minWidth: 250 }}
+            >
               <Select
                 showSearch
                 optionFilterProp="label"
                 placeholder="Select category"
-                options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                onChange={() => form.setFieldsValue({ subCategoryId: undefined } as Partial<FormValues>)}
+                options={topLevel.map((c) => ({ value: c.id, label: c.name }))}
                 dropdownRender={(menu) => (
                   <>
                     {menu}
@@ -347,21 +395,63 @@ export function ProductsPage() {
                         value={newCat}
                         onChange={(e) => setNewCat(e.target.value)}
                         onKeyDown={(e) => e.stopPropagation()}
-                        onPressEnter={addCategory}
-                        style={{ width: 180 }}
+                        onPressEnter={addParentCategory}
+                        style={{ width: 170 }}
                       />
-                      <Button
-                        type="text"
-                        icon={<PlusOutlined />}
-                        loading={addingCat}
-                        onClick={addCategory}
-                      >
+                      <Button type="text" icon={<PlusOutlined />} loading={addingCat} onClick={addParentCategory}>
                         Add
                       </Button>
                     </Space>
                   </>
                 )}
               />
+            </Form.Item>
+            <Form.Item
+              noStyle
+              shouldUpdate={(prev, cur) => prev.parentCategoryId !== cur.parentCategoryId}
+            >
+              {() => {
+                const pid = form.getFieldValue('parentCategoryId') as string | undefined;
+                const children = topLevel.find((c) => c.id === pid)?.children ?? [];
+                return (
+                  <Form.Item name="subCategoryId" label="Sub-category" style={{ minWidth: 250 }}>
+                    <Select
+                      allowClear
+                      showSearch
+                      optionFilterProp="label"
+                      disabled={!pid}
+                      placeholder={children.length ? 'Optional' : 'None — add one below'}
+                      options={children.map((c) => ({ value: c.id, label: c.name }))}
+                      dropdownRender={(menu) => (
+                        <>
+                          {menu}
+                          <Divider style={{ margin: '8px 0' }} />
+                          <Space style={{ padding: '0 8px 4px' }}>
+                            <Input
+                              placeholder="New sub-category"
+                              value={newSub}
+                              disabled={!pid}
+                              onChange={(e) => setNewSub(e.target.value)}
+                              onKeyDown={(e) => e.stopPropagation()}
+                              onPressEnter={addSubCategory}
+                              style={{ width: 160 }}
+                            />
+                            <Button
+                              type="text"
+                              icon={<PlusOutlined />}
+                              loading={addingSub}
+                              disabled={!pid}
+                              onClick={addSubCategory}
+                            >
+                              Add
+                            </Button>
+                          </Space>
+                        </>
+                      )}
+                    />
+                  </Form.Item>
+                );
+              }}
             </Form.Item>
           </Space>
           <Form.Item

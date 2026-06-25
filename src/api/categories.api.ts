@@ -41,3 +41,13 @@ export async function createCategory(input: CategoryInput): Promise<Category> {
   const { data } = await api.post<ApiEnvelope<Category>>('/categories', input);
   return data.data;
 }
+
+/** The nested category tree (top-level categories, each with their children). */
+export async function fetchCategoryTree(): Promise<Category[]> {
+  const { data } = await api.get<ApiEnvelope<Category[]>>('/categories');
+  return data.data ?? [];
+}
+
+export function useCategoryTree() {
+  return useQuery({ queryKey: ['categories-tree'], queryFn: fetchCategoryTree });
+}
