@@ -19,6 +19,7 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import type { FormInstance } from 'antd/es/form';
 import {
   EnvironmentOutlined,
   PlusOutlined,
@@ -418,6 +419,26 @@ interface InvFormValues {
   tiers?: { minQty: number; price: number }[];
 }
 
+/** Live "X% off MRP" hint under the price/MRP inputs in the pricing editor. */
+function DiscountHint({ form }: { form: FormInstance<InvFormValues> }) {
+  const price = Form.useWatch('price', form);
+  const mrp = Form.useWatch('mrp', form);
+  if (price == null || mrp == null) return null;
+  if (mrp <= price) {
+    return mrp < price ? (
+      <Typography.Text type="warning" style={{ fontSize: 12 }}>
+        MRP is below the selling price.
+      </Typography.Text>
+    ) : null;
+  }
+  const discount = Math.round(((mrp - price) / mrp) * 100);
+  return (
+    <Typography.Text type="success" style={{ fontSize: 12 }}>
+      Customers see {discount}% off MRP.
+    </Typography.Text>
+  );
+}
+
 function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => void }) {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
@@ -480,19 +501,39 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
     {
       title: 'Price',
       key: 'price',
-      render: (_, r) =>
-        r.storeProduct ? (
+      render: (_, r) => {
+        const sp = r.storeProduct;
+        if (!sp) return <Typography.Text type="secondary">—</Typography.Text>;
+        const mrp = sp.mrpPaise ?? r.mrpPaise ?? null;
+        const discount =
+          mrp != null && mrp > sp.pricePaise
+            ? Math.round(((mrp - sp.pricePaise) / mrp) * 100)
+            : null;
+        return (
           <div>
-            <div style={{ fontWeight: 600 }}>{formatPaise(r.storeProduct.pricePaise)}</div>
-            {r.storeProduct.priceTiers.length > 0 && (
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {r.storeProduct.priceTiers.length} tier(s)
-              </Typography.Text>
+            <Space size={6} wrap>
+              <span style={{ fontWeight: 600 }}>{formatPaise(sp.pricePaise)}</span>
+              {discount != null && (
+                <>
+                  <Typography.Text delete type="secondary" style={{ fontSize: 12 }}>
+                    {formatPaise(mrp!)}
+                  </Typography.Text>
+                  <Tag color="green" style={{ marginInlineEnd: 0 }}>
+                    {discount}% off
+                  </Tag>
+                </>
+              )}
+            </Space>
+            {sp.priceTiers.length > 0 && (
+              <div>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {sp.priceTiers.length} tier(s)
+                </Typography.Text>
+              </div>
             )}
           </div>
-        ) : (
-          <Typography.Text type="secondary">—</Typography.Text>
-        ),
+        );
+      },
     },
     {
       title: 'Stock',
@@ -627,6 +668,7 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
               <InputNumber min={0} style={{ width: 120 }} />
             </Form.Item>
           </Space>
+          <DiscountHint form={form} />
           <Form.Item name="isActive" label="Listed in store" valuePropName="checked" initialValue={true}>
             <Switch />
           </Form.Item>
