@@ -27,6 +27,7 @@ export interface ProductInput {
   description?: string;
   brand?: string;
   categoryId: string;
+  tags?: string[];
   unit?: ProductUnit;
   hsnCode?: string;
   gstRatePercent?: number;

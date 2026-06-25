@@ -4,6 +4,7 @@ import {
   Avatar,
   Button,
   Card,
+  Divider,
   Form,
   Input,
   InputNumber,
@@ -30,7 +31,7 @@ import {
   useProducts,
   type ProductInput,
 } from '../api/products.api';
-import { useCategoriesFlat } from '../api/categories.api';
+import { createCategory, useCategoriesFlat } from '../api/categories.api';
 import { useAuthStore } from '../store/auth.store';
 import type { Product, ProductUnit } from '../types';
 
@@ -41,6 +42,7 @@ interface FormValues {
   name: string;
   brand?: string;
   categoryId: string;
+  tags?: string[];
   unit: ProductUnit;
   hsnCode?: string;
   gstRatePercent: number;
@@ -65,6 +67,26 @@ export function ProductsPage() {
   const [form] = Form.useForm<FormValues>();
   const refresh = () => qc.invalidateQueries({ queryKey: ['products'] });
 
+  // Inline "add category" from the product form's category dropdown.
+  const [newCat, setNewCat] = useState('');
+  const [addingCat, setAddingCat] = useState(false);
+  const addCategory = async () => {
+    const name = newCat.trim();
+    if (name.length < 2) return;
+    setAddingCat(true);
+    try {
+      const created = await createCategory({ name });
+      await qc.invalidateQueries({ queryKey: ['categories-flat'] });
+      form.setFieldsValue({ categoryId: created.id } as Partial<FormValues>);
+      setNewCat('');
+      message.success(`Category "${created.name}" added`);
+    } catch (err) {
+      message.error((err as Error).message ?? 'Failed to add category');
+    } finally {
+      setAddingCat(false);
+    }
+  };
+
   const openCreate = () => {
     setEditing(null);
     form.resetFields();
@@ -77,6 +99,7 @@ export function ProductsPage() {
       name: p.name,
       brand: p.brand ?? undefined,
       categoryId: p.category?.id ?? p.categoryId,
+      tags: p.tags ?? [],
       unit: p.unit,
       hsnCode: p.hsnCode ?? undefined,
       gstRatePercent: p.gstRatePercent,
@@ -95,6 +118,7 @@ export function ProductsPage() {
       name: v.name,
       brand: v.brand,
       categoryId: v.categoryId,
+      tags: v.tags ?? [],
       unit: v.unit,
       hsnCode: v.hsnCode,
       gstRatePercent: v.gstRatePercent,
@@ -143,6 +167,15 @@ export function ProductsPage() {
             <Typography.Text type="secondary">
               {p.brand ?? '—'} · {p.category?.name ?? '—'}
             </Typography.Text>
+            {p.tags && p.tags.length > 0 && (
+              <div style={{ marginTop: 4 }}>
+                {p.tags.slice(0, 4).map((t) => (
+                  <Tag key={t} style={{ marginInlineEnd: 4 }}>
+                    {t}
+                  </Tag>
+                ))}
+              </div>
+            )}
           </div>
         </Space>
       ),
@@ -299,9 +332,46 @@ export function ProductsPage() {
                 optionFilterProp="label"
                 placeholder="Select category"
                 options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                dropdownRender={(menu) => (
+                  <>
+                    {menu}
+                    <Divider style={{ margin: '8px 0' }} />
+                    <Space style={{ padding: '0 8px 4px' }}>
+                      <Input
+                        placeholder="New category name"
+                        value={newCat}
+                        onChange={(e) => setNewCat(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onPressEnter={addCategory}
+                        style={{ width: 180 }}
+                      />
+                      <Button
+                        type="text"
+                        icon={<PlusOutlined />}
+                        loading={addingCat}
+                        onClick={addCategory}
+                      >
+                        Add
+                      </Button>
+                    </Space>
+                  </>
+                )}
               />
             </Form.Item>
           </Space>
+          <Form.Item
+            name="tags"
+            label="Search tags"
+            tooltip="Keywords customers can search by — type a word and press Enter"
+          >
+            <Select
+              mode="tags"
+              open={false}
+              suffixIcon={null}
+              tokenSeparators={[',']}
+              placeholder="cotton, festive, kids…"
+            />
+          </Form.Item>
           <Space style={{ display: 'flex' }} align="start">
             <Form.Item name="unit" label="Unit" rules={[{ required: true }]}>
               <Select style={{ width: 130 }} options={UNITS.map((u) => ({ value: u, label: u }))} />

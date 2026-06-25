@@ -66,6 +66,7 @@ export interface Product {
   isActive: boolean;
   categoryId?: string;
   category?: { id: string; name: string };
+  tags?: string[];
   _count?: { storeProducts: number };
   createdAt: string;
 }

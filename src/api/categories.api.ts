@@ -31,3 +31,13 @@ export async function fetchCategoriesFlat(): Promise<FlatCategory[]> {
 export function useCategoriesFlat() {
   return useQuery({ queryKey: ['categories-flat'], queryFn: fetchCategoriesFlat });
 }
+
+export interface CategoryInput {
+  name: string;
+  parentId?: string;
+}
+
+export async function createCategory(input: CategoryInput): Promise<Category> {
+  const { data } = await api.post<ApiEnvelope<Category>>('/categories', input);
+  return data.data;
+}
