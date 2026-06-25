@@ -9,6 +9,7 @@ import {
   SafetyCertificateOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
+  TagsOutlined,
   TeamOutlined,
   UserOutlined,
 } from '@ant-design/icons';
@@ -33,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/leads', label: 'Leads', icon: <FunnelPlotOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/customers', label: 'Customers', icon: <TeamOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/staff', label: 'Staff', icon: <UserOutlined />, roles: ['ADMIN'] },
+  { key: '/coupons', label: 'Coupons', icon: <TagsOutlined />, roles: ['ADMIN'] },
   { key: '/audit', label: 'Audit', icon: <SafetyCertificateOutlined />, roles: ['ADMIN'] },
 ];
 

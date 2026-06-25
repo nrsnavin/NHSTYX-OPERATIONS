@@ -10,6 +10,7 @@ import { OrdersPage } from '../pages/OrdersPage';
 import { CustomersPage } from '../pages/CustomersPage';
 import { StaffPage } from '../pages/StaffPage';
 import { AuditPage } from '../pages/AuditPage';
+import { CouponsPage } from '../pages/CouponsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -33,6 +34,7 @@ export function AppRoutes() {
       <Route element={<ProtectedRoute roles={['ADMIN']} />}>
         <Route element={<DashboardLayout />}>
           <Route path="/staff" element={<StaffPage />} />
+          <Route path="/coupons" element={<CouponsPage />} />
           <Route path="/audit" element={<AuditPage />} />
         </Route>
       </Route>
