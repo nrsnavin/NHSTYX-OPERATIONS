@@ -54,7 +54,10 @@ interface FormValues {
 }
 
 export function ProductsPage() {
-  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const role = useAuthStore((s) => s.user?.role);
+  const isAdmin = role === 'ADMIN';
+  // Admins and agents can add/edit catalog products; only admins delete.
+  const canEditCatalog = role === 'ADMIN' || role === 'AGENT';
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -206,7 +209,7 @@ export function ProductsPage() {
       key: 'isActive',
       render: (a: boolean) => (a ? <Tag color="green">Active</Tag> : <Tag>Inactive</Tag>),
     },
-    ...(isAdmin
+    ...(canEditCatalog
       ? [
           {
             title: 'Actions',
@@ -216,23 +219,25 @@ export function ProductsPage() {
                 <Button size="small" type="link" onClick={() => openEdit(p)}>
                   Edit
                 </Button>
-                <Popconfirm
-                  title="Delete this product?"
-                  description="Removes it from the catalog and all stores."
-                  onConfirm={async () => {
-                    try {
-                      await deleteProduct(p.id);
-                      message.success('Deleted');
-                      refresh();
-                    } catch (err) {
-                      message.error((err as Error).message ?? 'Failed');
-                    }
-                  }}
-                >
-                  <Button size="small" type="link" danger>
-                    Delete
-                  </Button>
-                </Popconfirm>
+                {isAdmin && (
+                  <Popconfirm
+                    title="Delete this product?"
+                    description="Removes it from the catalog and all stores."
+                    onConfirm={async () => {
+                      try {
+                        await deleteProduct(p.id);
+                        message.success('Deleted');
+                        refresh();
+                      } catch (err) {
+                        message.error((err as Error).message ?? 'Failed');
+                      }
+                    }}
+                  >
+                    <Button size="small" type="link" danger>
+                      Delete
+                    </Button>
+                  </Popconfirm>
+                )}
               </Space>
             ),
           },
@@ -245,7 +250,7 @@ export function ProductsPage() {
       title="Catalog"
       extra={
         <Space>
-          {isAdmin && (
+          {canEditCatalog && (
             <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
               New product
             </Button>
