@@ -6,6 +6,7 @@ import {
   DashboardOutlined,
   FunnelPlotOutlined,
   LogoutOutlined,
+  SafetyCertificateOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
   TeamOutlined,
@@ -32,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/leads', label: 'Leads', icon: <FunnelPlotOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/customers', label: 'Customers', icon: <TeamOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/staff', label: 'Staff', icon: <UserOutlined />, roles: ['ADMIN'] },
+  { key: '/audit', label: 'Audit', icon: <SafetyCertificateOutlined />, roles: ['ADMIN'] },
 ];
 
 export function DashboardLayout() {

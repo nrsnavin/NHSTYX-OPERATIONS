@@ -9,6 +9,7 @@ import { LeadsPage } from '../pages/LeadsPage';
 import { OrdersPage } from '../pages/OrdersPage';
 import { CustomersPage } from '../pages/CustomersPage';
 import { StaffPage } from '../pages/StaffPage';
+import { AuditPage } from '../pages/AuditPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -25,7 +26,14 @@ export function AppRoutes() {
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/customers" element={<CustomersPage />} />
+        </Route>
+      </Route>
+
+      {/* Admin-only console. */}
+      <Route element={<ProtectedRoute roles={['ADMIN']} />}>
+        <Route element={<DashboardLayout />}>
           <Route path="/staff" element={<StaffPage />} />
+          <Route path="/audit" element={<AuditPage />} />
         </Route>
       </Route>
 
