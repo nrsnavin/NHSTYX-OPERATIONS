@@ -33,6 +33,7 @@ import {
 } from '../api/products.api';
 import { createCategory, useCategoryTree, type Category } from '../api/categories.api';
 import { useAuthStore } from '../store/auth.store';
+import { VariantsModal } from '../components/VariantsModal';
 import type { Product, ProductUnit } from '../types';
 
 const UNITS: ProductUnit[] = ['PIECE', 'DOZEN', 'PACK', 'BOX', 'SET', 'KILOGRAM', 'METER'];
@@ -68,6 +69,7 @@ export function ProductsPage() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [variantsFor, setVariantsFor] = useState<Product | null>(null);
   const [uploading, setUploading] = useState(false);
   const [form] = Form.useForm<FormValues>();
   const refresh = () => qc.invalidateQueries({ queryKey: ['products'] });
@@ -260,6 +262,9 @@ export function ProductsPage() {
               <Space>
                 <Button size="small" type="link" onClick={() => openEdit(p)}>
                   Edit
+                </Button>
+                <Button size="small" type="link" onClick={() => setVariantsFor(p)}>
+                  Variants
                 </Button>
                 {isAdmin && (
                   <Popconfirm
@@ -494,6 +499,15 @@ export function ProductsPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {variantsFor && (
+        <VariantsModal
+          productId={variantsFor.id}
+          productName={variantsFor.name}
+          open={!!variantsFor}
+          onClose={() => setVariantsFor(null)}
+        />
+      )}
     </Card>
   );
 }
