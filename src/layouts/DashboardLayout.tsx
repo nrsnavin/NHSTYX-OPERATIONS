@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Dropdown, Layout, Menu, theme, Typography } from 'antd';
+import { Avatar, Badge, Dropdown, Layout, Menu, theme, Typography } from 'antd';
 import {
   AppstoreOutlined,
   DashboardOutlined,
@@ -16,6 +16,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../store/auth.store';
+import { useLowStock } from '../api/purchasing.api';
 import { logout as apiLogout } from '../api/auth.api';
 import type { Role } from '../types';
 
@@ -51,14 +52,35 @@ export function DashboardLayout() {
     token: { colorBgContainer },
   } = theme.useToken();
 
+  // Replenishment work waiting in Purchasing (store-scoped on the server).
+  const { data: lowStockItems } = useLowStock();
+  const lowStockCount = lowStockItems?.length ?? 0;
+
   const menuItems = useMemo(
     () =>
-      NAV_ITEMS.filter((item) => !user || item.roles.includes(user.role)).map((item) => ({
-        key: item.key,
-        icon: item.icon,
-        label: <Link to={item.key}>{item.label}</Link>,
-      })),
-    [user],
+      NAV_ITEMS.filter((item) => !user || item.roles.includes(user.role)).map((item) => {
+        const badge = item.key === '/purchasing' && lowStockCount > 0;
+        return {
+          key: item.key,
+          // When collapsed the label (and its badge) is hidden, so mark the
+          // icon with a dot instead.
+          icon: badge && collapsed ? <Badge dot offset={[-2, 2]}>{item.icon}</Badge> : item.icon,
+          label: (
+            <Link to={item.key}>
+              {item.label}
+              {badge && (
+                <Badge
+                  count={lowStockCount}
+                  size="small"
+                  overflowCount={99}
+                  style={{ marginInlineStart: 8 }}
+                />
+              )}
+            </Link>
+          ),
+        };
+      }),
+    [user, lowStockCount, collapsed],
   );
 
   const handleLogout = async () => {
