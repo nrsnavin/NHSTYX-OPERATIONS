@@ -415,6 +415,8 @@ interface InvFormValues {
   price: number;
   mrp?: number | null;
   stock: number;
+  reorderLevel?: number;
+  reorderQty?: number;
   isActive: boolean;
   tiers?: { minQty: number; price: number }[];
 }
@@ -461,6 +463,8 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
       price: sp ? sp.pricePaise / 100 : undefined,
       mrp: sp?.mrpPaise != null ? sp.mrpPaise / 100 : item.mrpPaise != null ? item.mrpPaise / 100 : undefined,
       stock: sp?.stockQty ?? 0,
+      reorderLevel: sp?.reorderLevel ?? 0,
+      reorderQty: sp?.reorderQty ?? 0,
       isActive: sp?.isActive ?? true,
       tiers: (sp?.priceTiers ?? []).map((t) => ({ minQty: t.minQty, price: t.pricePaise / 100 })),
     } as InvFormValues);
@@ -474,6 +478,8 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
         pricePaise: toPaise(v.price)!,
         mrpPaise: toPaise(v.mrp ?? undefined) ?? null,
         stockQty: v.stock ?? 0,
+        reorderLevel: v.reorderLevel ?? 0,
+        reorderQty: v.reorderQty ?? 0,
         isActive: v.isActive,
         priceTiers: (v.tiers ?? []).map((t) => ({ minQty: t.minQty, pricePaise: toPaise(t.price)! })),
       });
@@ -666,6 +672,14 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
             </Form.Item>
             <Form.Item name="stock" label="Stock" rules={[{ required: true, type: 'number', min: 0 }]}>
               <InputNumber min={0} style={{ width: 120 }} />
+            </Form.Item>
+          </Space>
+          <Space style={{ display: 'flex' }} align="start">
+            <Form.Item name="reorderLevel" label="Reorder level" tooltip="Alert when stock falls to/below this (0 = off)">
+              <InputNumber min={0} style={{ width: 160 }} placeholder="0 = no alert" />
+            </Form.Item>
+            <Form.Item name="reorderQty" label="Reorder qty" tooltip="Suggested quantity to put on a purchase order">
+              <InputNumber min={0} style={{ width: 140 }} />
             </Form.Item>
           </Space>
           <DiscountHint form={form} />

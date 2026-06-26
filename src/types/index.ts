@@ -126,6 +126,8 @@ export interface StoreInventoryItem {
     pricePaise: number;
     mrpPaise?: number | null;
     stockQty: number;
+    reorderLevel: number;
+    reorderQty: number;
     isActive: boolean;
     priceTiers: PriceTier[];
   } | null;
@@ -205,6 +207,63 @@ export interface SourceAnalyticsRow {
   total: number;
   won: number;
   conversionRate: number;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  gstin?: string | null;
+  addressLine?: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface LowStockItem {
+  productId: string;
+  storeId: string;
+  storeName: string;
+  storeCity: string;
+  name: string;
+  brand?: string | null;
+  unit: ProductUnit;
+  imageUrl?: string | null;
+  stockQty: number;
+  reorderLevel: number;
+  reorderQty: number;
+  pricePaise: number;
+  suggestedQty: number;
+}
+
+export type PurchaseOrderStatus = 'DRAFT' | 'ORDERED' | 'PARTIAL' | 'RECEIVED' | 'CANCELLED';
+
+export interface PurchaseOrderItem {
+  id: string;
+  productId: string;
+  variantId?: string | null;
+  productName: string;
+  variantName?: string | null;
+  orderedQty: number;
+  receivedQty: number;
+  unitCostPaise: number;
+  lineCostPaise: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  poNumber: string;
+  status: PurchaseOrderStatus;
+  store?: StoreSummary | null;
+  supplier?: { id: string; name: string; phone?: string | null } | null;
+  createdBy?: { id: string; name: string } | null;
+  notes?: string | null;
+  expectedAt?: string | null;
+  totalCostPaise: number;
+  receivedAt?: string | null;
+  items: PurchaseOrderItem[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type QuotationStatus =

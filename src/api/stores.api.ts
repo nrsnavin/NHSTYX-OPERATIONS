@@ -83,6 +83,8 @@ export interface UpsertStoreProductInput {
   pricePaise: number;
   mrpPaise?: number | null;
   stockQty?: number;
+  reorderLevel?: number;
+  reorderQty?: number;
   isActive?: boolean;
   priceTiers?: PriceTier[];
 }
