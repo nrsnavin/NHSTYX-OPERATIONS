@@ -4,24 +4,39 @@ import {
   Avatar,
   Button,
   Card,
+  Col,
   Divider,
+  Empty,
   Form,
   Input,
   InputNumber,
   Modal,
+  Pagination,
   Popconfirm,
+  Row,
+  Segmented,
   Select,
   Space,
   Switch,
   Table,
   Tag,
+  Tooltip,
   Typography,
   Upload,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
+import {
+  BranchesOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined,
+  ProfileOutlined,
+  UploadOutlined,
+} from '@ant-design/icons';
 import { Link } from 'react-router-dom';
+import { formatPaise } from '../lib/money';
+import { StatusPill } from '../components/StatusPill';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   createProduct,
@@ -64,7 +79,8 @@ export function ProductsPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const { data, isLoading } = useProducts({ page, limit: 10, search: search || undefined });
+  const [view, setView] = useState<'grid' | 'table'>('grid');
+  const { data, isLoading } = useProducts({ page, limit: view === 'grid' ? 12 : 10, search: search || undefined });
   const { data: tree } = useCategoryTree();
   const topLevel: Category[] = tree ?? [];
 
@@ -202,6 +218,103 @@ export function ProductsPage() {
     return false; // prevent antd's default upload
   };
 
+  const doDelete = async (p: Product) => {
+    try {
+      await deleteProduct(p.id);
+      message.success('Deleted');
+      refresh();
+    } catch (err) {
+      message.error((err as Error).message ?? 'Failed');
+    }
+  };
+
+  // Instamart-style catalog card.
+  const productCard = (p: Product) => {
+    const stocked = p._count?.storeProducts ?? 0;
+    const actions = canEditCatalog
+      ? [
+          <Tooltip title="Edit" key="e">
+            <EditOutlined onClick={() => openEdit(p)} />
+          </Tooltip>,
+          <Tooltip title="Variants" key="v">
+            <BranchesOutlined onClick={() => setVariantsFor(p)} />
+          </Tooltip>,
+          <Tooltip title="Ledger" key="l">
+            <ProfileOutlined onClick={() => setLedgerFor(p)} />
+          </Tooltip>,
+          ...(isAdmin
+            ? [
+                <Popconfirm
+                  key="d"
+                  title="Delete this product?"
+                  description="Removes it from the catalog and all stores."
+                  onConfirm={() => doDelete(p)}
+                >
+                  <DeleteOutlined style={{ color: '#ff4d4f' }} />
+                </Popconfirm>,
+              ]
+            : []),
+        ]
+      : undefined;
+    return (
+      <Card
+        hoverable
+        styles={{ body: { padding: 14 } }}
+        cover={
+          <div
+            style={{
+              height: 150,
+              background: '#f6f7f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderBottom: '1px solid #eef0f3',
+              overflow: 'hidden',
+            }}
+          >
+            {p.imageUrl ? (
+              <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <span style={{ fontSize: 40, color: '#c8ccd4', fontWeight: 800 }}>{p.name[0]}</span>
+            )}
+          </div>
+        }
+        actions={actions}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: 8 }}>
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 15,
+              lineHeight: 1.25,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {p.name}
+          </div>
+          {!p.isActive && <StatusPill>Inactive</StatusPill>}
+        </div>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {p.brand ?? '—'} · {p.category?.name ?? '—'}
+        </Typography.Text>
+        <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <StatusPill>{p.unit}</StatusPill>
+          <StatusPill>{p.gstRatePercent}% GST</StatusPill>
+          {stocked > 0 ? (
+            <StatusPill color="blue">
+              {stocked} store{stocked > 1 ? 's' : ''}
+            </StatusPill>
+          ) : (
+            <StatusPill>Not stocked</StatusPill>
+          )}
+          {p.mrpPaise != null && <StatusPill color="orange">MRP {formatPaise(p.mrpPaise)}</StatusPill>}
+        </div>
+      </Card>
+    );
+  };
+
   const columns: ColumnsType<Product> = [
     {
       title: 'Product',
@@ -302,11 +415,17 @@ export function ProductsPage() {
       title="Catalog"
       extra={
         <Space>
-          {canEditCatalog && (
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              New product
-            </Button>
-          )}
+          <Segmented
+            value={view}
+            onChange={(v) => {
+              setView(v as 'grid' | 'table');
+              setPage(1);
+            }}
+            options={[
+              { label: 'Grid', value: 'grid' },
+              { label: 'Table', value: 'table' },
+            ]}
+          />
           <Input.Search
             placeholder="Search products…"
             allowClear
@@ -316,6 +435,11 @@ export function ProductsPage() {
             }}
             style={{ width: 240 }}
           />
+          {canEditCatalog && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              New product
+            </Button>
+          )}
         </Space>
       }
     >
@@ -331,19 +455,44 @@ export function ProductsPage() {
           </>
         }
       />
-      <Table<Product>
-        rowKey="id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={data?.items ?? []}
-        pagination={{
-          current: page,
-          pageSize: 10,
-          total: data?.pagination.total ?? 0,
-          onChange: setPage,
-          showSizeChanger: false,
-        }}
-      />
+      {view === 'grid' ? (
+        (data?.items?.length ?? 0) === 0 && !isLoading ? (
+          <Empty description="No products" />
+        ) : (
+          <>
+            <Row gutter={[16, 16]}>
+              {(data?.items ?? []).map((p) => (
+                <Col xs={24} sm={12} md={8} xl={6} key={p.id}>
+                  {productCard(p)}
+                </Col>
+              ))}
+            </Row>
+            <div style={{ textAlign: 'right', marginTop: 20 }}>
+              <Pagination
+                current={page}
+                pageSize={12}
+                total={data?.pagination.total ?? 0}
+                onChange={setPage}
+                showSizeChanger={false}
+              />
+            </div>
+          </>
+        )
+      ) : (
+        <Table<Product>
+          rowKey="id"
+          loading={isLoading}
+          columns={columns}
+          dataSource={data?.items ?? []}
+          pagination={{
+            current: page,
+            pageSize: 10,
+            total: data?.pagination.total ?? 0,
+            onChange: setPage,
+            showSizeChanger: false,
+          }}
+        />
+      )}
 
       <Modal
         title={editing ? 'Edit product' : 'New product'}

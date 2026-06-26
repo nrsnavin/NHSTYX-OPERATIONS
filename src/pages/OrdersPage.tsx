@@ -34,6 +34,7 @@ import {
 import { useCustomers } from '../api/customers.api';
 import { useProducts } from '../api/products.api';
 import { formatPaise } from '../lib/money';
+import { StatusPill } from '../components/StatusPill';
 import type { Order, OrderPaymentStatus, OrderStatus, PaymentMethod } from '../types';
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -65,9 +66,10 @@ const PAYMENT_COLORS: Record<OrderPaymentStatus, string> = {
 
 export function OrdersPage() {
   const [page, setPage] = useState(1);
+  const [status, setStatus] = useState<OrderStatus | undefined>(undefined);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const { data, isLoading } = useOrders({ page, limit: 10 });
+  const { data, isLoading } = useOrders({ page, limit: 10, status });
   const updateStatus = useUpdateOrderStatus();
 
   const columns: ColumnsType<Order> = [
@@ -111,7 +113,7 @@ export function OrdersPage() {
       key: 'payment',
       render: (_, record) => (
         <Space direction="vertical" size={0}>
-          <Tag color={PAYMENT_COLORS[record.paymentStatus]}>{record.paymentStatus}</Tag>
+          <StatusPill color={PAYMENT_COLORS[record.paymentStatus]}>{record.paymentStatus}</StatusPill>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {record.paymentMethod}
             {record.amountDuePaise > 0 ? ` · due ${formatPaise(record.amountDuePaise)}` : ''}
@@ -176,6 +178,31 @@ export function OrdersPage() {
         </Button>
       }
     >
+      <Space wrap style={{ marginBottom: 16 }}>
+        <Button
+          shape="round"
+          type={status === undefined ? 'primary' : 'default'}
+          onClick={() => {
+            setStatus(undefined);
+            setPage(1);
+          }}
+        >
+          All
+        </Button>
+        {STATUS_OPTIONS.map((s) => (
+          <Button
+            key={s}
+            shape="round"
+            type={status === s ? 'primary' : 'default'}
+            onClick={() => {
+              setStatus(s);
+              setPage(1);
+            }}
+          >
+            {s}
+          </Button>
+        ))}
+      </Space>
       <Table<Order>
         rowKey="id"
         loading={isLoading}

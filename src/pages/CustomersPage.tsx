@@ -32,6 +32,7 @@ import {
 } from '../api/customers.api';
 import { addActivity, fetchActivities } from '../api/crm.api';
 import { formatPaise } from '../lib/money';
+import { StatusPill } from '../components/StatusPill';
 import type { Customer, CustomerSegment, CustomerStatus } from '../types';
 
 const STATUS_TAG: Record<CustomerStatus, { color: string; label: string }> = {
@@ -130,7 +131,7 @@ export function CustomersPage() {
       key: 'status',
       render: (_, r) => {
         const t = STATUS_TAG[r.status];
-        return <Tag color={t.color}>{t.label}</Tag>;
+        return <StatusPill color={t.color}>{t.label}</StatusPill>;
       },
     },
     {
@@ -158,7 +159,7 @@ export function CustomersPage() {
         const seg = r.segment ? SEGMENT_TAG[r.segment] : null;
         return (
           <div>
-            {seg && <Tag color={seg.color}>{seg.label}</Tag>}
+            {seg && <StatusPill color={seg.color}>{seg.label}</StatusPill>}
             <div>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {r.orderCount ?? 0} orders · {formatPaise(r.ltvPaise ?? 0)}
@@ -341,7 +342,7 @@ function Customer360Drawer({ customer, onClose }: { customer: Customer | null; o
       ) : (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <Space>
-            {seg && <Tag color={seg.color}>{seg.label}</Tag>}
+            {seg && <StatusPill color={seg.color}>{seg.label}</StatusPill>}
             <Typography.Text type="secondary">
               {data.creditApproved ? `Credit ${formatPaise(data.creditLimitPaise)}` : 'No credit'}
             </Typography.Text>
