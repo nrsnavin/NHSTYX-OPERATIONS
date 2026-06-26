@@ -207,6 +207,66 @@ export interface SourceAnalyticsRow {
   conversionRate: number;
 }
 
+export type QuotationStatus =
+  | 'DRAFT'
+  | 'SENT'
+  | 'ACCEPTED'
+  | 'DECLINED'
+  | 'EXPIRED'
+  | 'CONVERTED';
+
+export interface QuotationItem {
+  id: string;
+  productId: string;
+  variantId?: string | null;
+  productName: string;
+  variantName?: string | null;
+  unit: ProductUnit;
+  quantity: number;
+  unitPricePaise: number;
+  gstRatePercent: number;
+  lineSubtotalPaise: number;
+  cgstPaise: number;
+  sgstPaise: number;
+  igstPaise: number;
+  lineTotalPaise: number;
+}
+
+export interface Quotation {
+  id: string;
+  quoteNumber: string;
+  status: QuotationStatus;
+  title?: string | null;
+  notes?: string | null;
+  validUntil?: string | null;
+  customerId?: string | null;
+  customer?: {
+    id: string;
+    shopName: string;
+    phone: string;
+    gstin?: string | null;
+    creditApproved: boolean;
+    creditLimitPaise: number;
+    creditDays: number;
+  } | null;
+  leadId?: string | null;
+  lead?: { id: string; shopName: string; phone: string } | null;
+  store?: StoreSummary | null;
+  createdBy?: { id: string; name: string } | null;
+  placeOfSupply?: string | null;
+  subtotalPaise: number;
+  cgstPaise: number;
+  sgstPaise: number;
+  igstPaise: number;
+  discountPaise: number;
+  totalPaise: number;
+  orderId?: string | null;
+  orderNumber?: string | null;
+  items: QuotationItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Activity {
   id: string;
   type: ActivityType;

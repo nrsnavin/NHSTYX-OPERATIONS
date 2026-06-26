@@ -6,6 +6,7 @@ import { DashboardPage } from '../pages/DashboardPage';
 import { ProductsPage } from '../pages/ProductsPage';
 import { StoresPage } from '../pages/StoresPage';
 import { LeadsPage } from '../pages/LeadsPage';
+import { QuotationsPage } from '../pages/QuotationsPage';
 import { OrdersPage } from '../pages/OrdersPage';
 import { CustomersPage } from '../pages/CustomersPage';
 import { StaffPage } from '../pages/StaffPage';
@@ -26,6 +27,7 @@ export function AppRoutes() {
           <Route path="/stores" element={<StoresPage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/leads" element={<LeadsPage />} />
+          <Route path="/quotations" element={<QuotationsPage />} />
           <Route path="/customers" element={<CustomersPage />} />
         </Route>
       </Route>
