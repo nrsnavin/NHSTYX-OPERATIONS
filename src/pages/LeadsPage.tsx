@@ -38,6 +38,7 @@ import {
 } from '../api/crm.api';
 import { useUsers } from '../api/users.api';
 import { useAuthStore } from '../store/auth.store';
+import { CrmDashboard } from '../components/CrmDashboard';
 import { formatPaise } from '../lib/money';
 import type { ActivityType, FieldVisit, Lead, LeadSource, LeadStage, SourceAnalyticsRow } from '../types';
 
@@ -63,7 +64,7 @@ export function LeadsPage() {
   const qc = useQueryClient();
   const me = useAuthStore((s) => s.user);
 
-  const [view, setView] = useState<'board' | 'table'>('board');
+  const [view, setView] = useState<'board' | 'table' | 'dashboard'>('board');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [stage, setStage] = useState<LeadStage | undefined>(undefined);
@@ -160,10 +161,11 @@ export function LeadsPage() {
           <Segmented
             size="small"
             value={view}
-            onChange={(v) => setView(v as 'board' | 'table')}
+            onChange={(v) => setView(v as 'board' | 'table' | 'dashboard')}
             options={[
               { label: 'Board', value: 'board' },
               { label: 'Table', value: 'table' },
+              { label: 'Insights', value: 'dashboard' },
             ]}
           />
         </Space>
@@ -182,9 +184,11 @@ export function LeadsPage() {
         </Space>
       }
     >
-      <div style={{ marginBottom: 16 }}>{filters}</div>
+      {view !== 'dashboard' && <div style={{ marginBottom: 16 }}>{filters}</div>}
 
-      {view === 'board' ? (
+      {view === 'dashboard' ? (
+        <CrmDashboard />
+      ) : view === 'board' ? (
         <PipelineBoard
           leads={data?.items ?? []}
           loading={isLoading}

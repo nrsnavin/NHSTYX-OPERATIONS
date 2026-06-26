@@ -3,6 +3,7 @@ import { api } from './axios';
 import type {
   Activity,
   ApiEnvelope,
+  CrmDashboardData,
   FieldVisit,
   Lead,
   LeadStage,
@@ -80,6 +81,15 @@ export async function fetchSourceAnalytics(): Promise<SourceAnalyticsRow[]> {
 
 export function useSourceAnalytics(enabled = true) {
   return useQuery({ queryKey: ['lead-source-analytics'], queryFn: fetchSourceAnalytics, enabled });
+}
+
+export async function fetchCrmDashboard(): Promise<CrmDashboardData> {
+  const { data } = await api.get<ApiEnvelope<CrmDashboardData>>('/crm/analytics/dashboard');
+  return data.data;
+}
+
+export function useCrmDashboard(enabled = true) {
+  return useQuery({ queryKey: ['crm-dashboard'], queryFn: fetchCrmDashboard, enabled });
 }
 
 export async function convertLead(id: string): Promise<Lead> {

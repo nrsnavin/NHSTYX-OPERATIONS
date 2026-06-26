@@ -209,6 +209,41 @@ export interface SourceAnalyticsRow {
   conversionRate: number;
 }
 
+export interface PipelineStageStat {
+  stage: LeadStage;
+  count: number;
+  valuePaise: number;
+}
+
+export interface AgentLeaderRow {
+  agentId: string;
+  name: string;
+  total: number;
+  won: number;
+  wonValuePaise: number;
+}
+
+export interface ConversionPoint {
+  month: string;
+  created: number;
+  won: number;
+}
+
+export interface CrmAging {
+  overdue: number;
+  today: number;
+  upcoming: number;
+  later: number;
+  none: number;
+}
+
+export interface CrmDashboardData {
+  pipeline: PipelineStageStat[];
+  leaderboard: AgentLeaderRow[];
+  conversion: ConversionPoint[];
+  aging: CrmAging;
+}
+
 export interface Supplier {
   id: string;
   name: string;
