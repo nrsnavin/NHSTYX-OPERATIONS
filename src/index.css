@@ -1,6 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
     sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -13,4 +18,41 @@ body,
   margin: 0;
   padding: 0;
   height: 100%;
+}
+
+body {
+  background: #f6f7f9;
+}
+
+/* Slim, unobtrusive scrollbars to match the lighter surfaces. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #d4d8df transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #d4d8df;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #b9bfc9;
+  background-clip: content-box;
+}
+
+/* Softer, layered card elevation across the console. */
+.ant-card {
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+  border: 1px solid #eef0f3;
+}
+
+.ant-menu-light .ant-menu-item-selected {
+  font-weight: 600;
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Badge, Dropdown, Layout, Menu, theme, Typography } from 'antd';
+import { Avatar, Badge, Dropdown, Layout, Menu, Tag, Typography } from 'antd';
 import {
   AppstoreOutlined,
   DashboardOutlined,
@@ -43,18 +43,71 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/audit', label: 'Audit', icon: <SafetyCertificateOutlined />, roles: ['ADMIN'] },
 ];
 
+const LINE = '#eef0f3';
+
+const initials = (name?: string) =>
+  (name ?? '?')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+function Brand({ collapsed }: { collapsed: boolean }) {
+  return (
+    <Link
+      to="/"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        height: 64,
+        padding: collapsed ? 0 : '0 18px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        borderBottom: `1px solid ${LINE}`,
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          flexShrink: 0,
+          borderRadius: 10,
+          background: 'linear-gradient(135deg, #ff8a4c, #f2530a)',
+          color: '#fff',
+          fontWeight: 800,
+          fontSize: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 10px rgba(242,83,10,0.35)',
+        }}
+      >
+        NH
+      </div>
+      {!collapsed && (
+        <div style={{ lineHeight: 1.1 }}>
+          <div style={{ fontWeight: 800, fontSize: 16, color: '#1f2937' }}>NH Styx</div>
+          <div style={{ fontSize: 11, color: '#9aa1ad', fontWeight: 600, letterSpacing: 0.3 }}>
+            OPERATIONS
+          </div>
+        </div>
+      )}
+    </Link>
+  );
+}
+
 export function DashboardLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, clear } = useAuthStore();
-  const {
-    token: { colorBgContainer },
-  } = theme.useToken();
 
   // Replenishment work waiting in Purchasing (store-scoped on the server).
   const { data: lowStockItems } = useLowStock();
   const lowStockCount = lowStockItems?.length ?? 0;
+
+  const currentTitle = NAV_ITEMS.find((i) => i.key === location.pathname)?.label ?? 'Operations';
 
   const menuItems = useMemo(
     () =>
@@ -95,61 +148,80 @@ export function DashboardLayout() {
   };
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} theme="dark">
-        <div
-          style={{
-            height: 48,
-            margin: 16,
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: collapsed ? 16 : 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {collapsed ? 'NH' : 'NH Styx'}
-        </div>
+    <Layout style={{ minHeight: '100vh' }} hasSider>
+      <Sider
+        collapsible
+        collapsed={collapsed}
+        onCollapse={setCollapsed}
+        theme="light"
+        width={248}
+        style={{
+          borderRight: `1px solid ${LINE}`,
+          position: 'sticky',
+          top: 0,
+          height: '100vh',
+          overflow: 'auto',
+        }}
+      >
+        <Brand collapsed={collapsed} />
         <Menu
-          theme="dark"
+          theme="light"
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
+          style={{ borderInlineEnd: 'none', padding: '12px 0' }}
         />
       </Sider>
+
       <Layout>
         <Header
           style={{
-            padding: '0 24px',
-            background: colorBgContainer,
+            background: '#fff',
+            borderBottom: `1px solid ${LINE}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
           }}
         >
-          <Typography.Text strong>Operations Console</Typography.Text>
+          <Typography.Text style={{ fontSize: 17, fontWeight: 700 }}>{currentTitle}</Typography.Text>
+
           <Dropdown
             menu={{
               items: [
-                {
-                  key: 'logout',
-                  icon: <LogoutOutlined />,
-                  label: 'Sign out',
-                  onClick: handleLogout,
-                },
+                { key: 'logout', icon: <LogoutOutlined />, label: 'Sign out', onClick: handleLogout },
               ],
             }}
           >
-            <span style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Avatar icon={<UserOutlined />} />
-              <span>
-                {user?.name ?? user?.email}{' '}
-                <Typography.Text type="secondary">({user?.role})</Typography.Text>
-              </span>
-            </span>
+            <div
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '6px 10px 6px 6px',
+                borderRadius: 999,
+                border: `1px solid ${LINE}`,
+              }}
+            >
+              <Avatar size={32} style={{ background: '#f2530a', fontWeight: 700, fontSize: 13 }}>
+                {initials(user?.name ?? user?.email)}
+              </Avatar>
+              <div style={{ lineHeight: 1.15, marginRight: 2 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{user?.name ?? user?.email}</div>
+                <Tag
+                  color={user?.role === 'ADMIN' ? 'orange' : 'default'}
+                  style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 6px' }}
+                >
+                  {user?.role}
+                </Tag>
+              </div>
+            </div>
           </Dropdown>
         </Header>
+
         <Content style={{ margin: 24 }}>
           <Outlet />
         </Content>
