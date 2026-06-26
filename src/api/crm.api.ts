@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './axios';
-import type { Activity, ApiEnvelope, Lead, LeadStage, Pagination } from '../types';
+import type {
+  Activity,
+  ApiEnvelope,
+  Lead,
+  LeadStage,
+  Pagination,
+  SourceAnalyticsRow,
+} from '../types';
 
 export interface LeadsResponse {
   success: boolean;
@@ -14,6 +21,7 @@ interface LeadQuery {
   limit?: number;
   search?: string;
   stage?: LeadStage;
+  assignedToId?: string;
   due?: boolean;
 }
 
@@ -51,10 +59,26 @@ export async function createLead(input: LeadInput): Promise<Lead> {
 
 export async function updateLead(
   id: string,
-  input: Partial<LeadInput> & { stage?: LeadStage; lostReason?: string | null; nextFollowUpAt?: string | null },
+  input: Partial<LeadInput> & {
+    stage?: LeadStage;
+    lostReason?: string | null;
+    nextFollowUpAt?: string | null;
+    assignedToId?: string | null;
+  },
 ): Promise<Lead> {
   const { data } = await api.patch<ApiEnvelope<Lead>>(`/crm/leads/${id}`, input);
   return data.data;
+}
+
+export async function fetchSourceAnalytics(): Promise<SourceAnalyticsRow[]> {
+  const { data } = await api.get<{ success: boolean; items: SourceAnalyticsRow[] }>(
+    '/crm/analytics/sources',
+  );
+  return data.items;
+}
+
+export function useSourceAnalytics(enabled = true) {
+  return useQuery({ queryKey: ['lead-source-analytics'], queryFn: fetchSourceAnalytics, enabled });
 }
 
 export async function convertLead(id: string): Promise<Lead> {

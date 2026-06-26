@@ -200,6 +200,13 @@ export type LeadStage = 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'WON' | 'LOST';
 export type LeadSource = 'MANUAL' | 'SIGNUP';
 export type ActivityType = 'NOTE' | 'CALL' | 'VISIT' | 'EMAIL';
 
+export interface SourceAnalyticsRow {
+  source: LeadSource;
+  total: number;
+  won: number;
+  conversionRate: number;
+}
+
 export interface Activity {
   id: string;
   type: ActivityType;

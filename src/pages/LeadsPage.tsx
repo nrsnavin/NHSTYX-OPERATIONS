@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
+  Avatar,
   Button,
   Card,
   DatePicker,
@@ -9,17 +10,19 @@ import {
   Input,
   InputNumber,
   Modal,
-  Radio,
+  Progress,
+  Segmented,
   Select,
   Space,
   Table,
   Tag,
   Timeline,
+  Tooltip,
   Typography,
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined } from '@ant-design/icons';
+import { BarChartOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -29,9 +32,13 @@ import {
   updateLead,
   useLead,
   useLeads,
+  useSourceAnalytics,
+  type LeadsResponse,
 } from '../api/crm.api';
+import { useUsers } from '../api/users.api';
+import { useAuthStore } from '../store/auth.store';
 import { formatPaise } from '../lib/money';
-import type { ActivityType, Lead, LeadStage } from '../types';
+import type { ActivityType, Lead, LeadSource, LeadStage, SourceAnalyticsRow } from '../types';
 
 const STAGES: LeadStage[] = ['NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST'];
 const STAGE_COLOR: Record<LeadStage, string> = {
@@ -43,17 +50,41 @@ const STAGE_COLOR: Record<LeadStage, string> = {
 };
 const ACTIVITY_TYPES: ActivityType[] = ['NOTE', 'CALL', 'VISIT', 'EMAIL'];
 
+const initials = (name?: string | null) =>
+  (name ?? '?')
+    .split(' ')
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
 export function LeadsPage() {
   const qc = useQueryClient();
+  const me = useAuthStore((s) => s.user);
+
+  const [view, setView] = useState<'board' | 'table'>('board');
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [stage, setStage] = useState<LeadStage | undefined>(undefined);
-  const { data, isLoading } = useLeads({ page, limit: 10, search: search || undefined, stage });
-  const counts = data?.counts ?? {};
+  const [mine, setMine] = useState(false);
+  const [due, setDue] = useState(false);
 
   const [selected, setSelected] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [form] = Form.useForm();
+
+  const assignedToId = mine && me ? me.id : undefined;
+  const params = useMemo(
+    () =>
+      view === 'board'
+        ? { limit: 100, search: search || undefined, assignedToId, due: due || undefined }
+        : { page, limit: 10, search: search || undefined, stage, assignedToId, due: due || undefined },
+    [view, page, search, stage, assignedToId, due],
+  );
+  const { data, isLoading } = useLeads(params);
+  const counts = data?.counts ?? {};
+
   const refresh = () => qc.invalidateQueries({ queryKey: ['leads'] });
 
   const submitCreate = async () => {
@@ -76,119 +107,101 @@ export function LeadsPage() {
     }
   };
 
+  // Optimistically move the card, then reconcile from the server.
   const changeStage = async (id: string, next: LeadStage) => {
+    const key = ['leads', params];
+    const prev = qc.getQueryData<LeadsResponse>(key);
+    qc.setQueryData<LeadsResponse>(key, (old) =>
+      old ? { ...old, items: old.items.map((l) => (l.id === id ? { ...l, stage: next } : l)) } : old,
+    );
     try {
       await updateLead(id, { stage: next });
       refresh();
     } catch (e) {
+      if (prev) qc.setQueryData(key, prev);
       message.error((e as Error).message ?? 'Failed');
     }
   };
 
-  const columns: ColumnsType<Lead> = [
-    {
-      title: 'Shop',
-      key: 'shop',
-      render: (_, l) => (
-        <Button type="link" style={{ padding: 0, height: 'auto' }} onClick={() => setSelected(l.id)}>
-          <div style={{ textAlign: 'left' }}>
-            <div style={{ fontWeight: 600 }}>{l.shopName}</div>
-            <Typography.Text type="secondary">
-              {l.contactName ?? '—'} · {l.phone}
-            </Typography.Text>
-          </div>
+  const filters = (
+    <Space wrap>
+      <Input.Search
+        placeholder="Search shop / phone…"
+        allowClear
+        defaultValue={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        style={{ width: 200 }}
+      />
+      {me && (
+        <Tooltip title="Only leads assigned to me">
+          <Button type={mine ? 'primary' : 'default'} icon={<UserOutlined />} onClick={() => setMine((m) => !m)}>
+            My pipeline
+          </Button>
+        </Tooltip>
+      )}
+      <Tooltip title="Follow-up due today or overdue">
+        <Button type={due ? 'primary' : 'default'} onClick={() => setDue((d) => !d)}>
+          Due
         </Button>
-      ),
-    },
-    {
-      title: 'Source',
-      key: 'source',
-      render: (_, l) => <Tag>{l.source === 'SIGNUP' ? 'Sign-up' : 'Prospect'}</Tag>,
-    },
-    { title: 'City', dataIndex: 'city', key: 'city', render: (c?: string) => c ?? '—' },
-    {
-      title: 'Value',
-      key: 'value',
-      render: (_, l) => (l.estValuePaise > 0 ? formatPaise(l.estValuePaise) : '—'),
-    },
-    {
-      title: 'Follow-up',
-      key: 'followup',
-      render: (_, l) =>
-        l.nextFollowUpAt ? (
-          <Tag color={dayjs(l.nextFollowUpAt).isBefore(dayjs()) ? 'red' : 'default'}>
-            {dayjs(l.nextFollowUpAt).format('DD MMM')}
-          </Tag>
-        ) : (
-          '—'
-        ),
-    },
-    {
-      title: 'Stage',
-      key: 'stage',
-      render: (_, l) => (
-        <Select<LeadStage>
-          size="small"
-          value={l.stage}
-          style={{ width: 130 }}
-          onChange={(s) => changeStage(l.id, s)}
-          options={STAGES.map((s) => ({ value: s, label: <Tag color={STAGE_COLOR[s]}>{s}</Tag> }))}
-        />
-      ),
-    },
-  ];
+      </Tooltip>
+    </Space>
+  );
 
   return (
     <Card
-      title="Leads"
+      title={
+        <Space>
+          Leads
+          <Segmented
+            size="small"
+            value={view}
+            onChange={(v) => setView(v as 'board' | 'table')}
+            options={[
+              { label: 'Board', value: 'board' },
+              { label: 'Table', value: 'table' },
+            ]}
+          />
+        </Space>
+      }
       extra={
         <Space>
-          <Input.Search
-            placeholder="Search shop / phone…"
-            allowClear
-            onSearch={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
-            style={{ width: 220 }}
-          />
+          <Button icon={<BarChartOutlined />} onClick={() => setAnalyticsOpen(true)}>
+            Sources
+          </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>
             New lead
           </Button>
         </Space>
       }
     >
-      <Radio.Group
-        value={stage ?? 'ALL'}
-        onChange={(e) => {
-          setStage(e.target.value === 'ALL' ? undefined : (e.target.value as LeadStage));
-          setPage(1);
-        }}
-        optionType="button"
-        buttonStyle="solid"
-        style={{ marginBottom: 16 }}
-      >
-        <Radio.Button value="ALL">All</Radio.Button>
-        {STAGES.map((s) => (
-          <Radio.Button key={s} value={s}>
-            {s} {counts[s] ? `(${counts[s]})` : ''}
-          </Radio.Button>
-        ))}
-      </Radio.Group>
+      <div style={{ marginBottom: 16 }}>{filters}</div>
 
-      <Table<Lead>
-        rowKey="id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={data?.items ?? []}
-        pagination={{
-          current: page,
-          pageSize: 10,
-          total: data?.pagination.total ?? 0,
-          onChange: setPage,
-          showSizeChanger: false,
-        }}
-      />
+      {view === 'board' ? (
+        <PipelineBoard
+          leads={data?.items ?? []}
+          loading={isLoading}
+          onMove={changeStage}
+          onOpen={setSelected}
+        />
+      ) : (
+        <LeadsTable
+          data={data}
+          loading={isLoading}
+          page={page}
+          counts={counts}
+          stage={stage}
+          onStage={(s) => {
+            setStage(s);
+            setPage(1);
+          }}
+          onPage={setPage}
+          onChangeStage={changeStage}
+          onOpen={setSelected}
+        />
+      )}
 
       <Modal
         title="New lead"
@@ -224,19 +237,312 @@ export function LeadsPage() {
         </Form>
       </Modal>
 
+      <SourceAnalyticsModal open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
       <LeadDrawer id={selected} onClose={() => setSelected(null)} onChanged={refresh} />
     </Card>
   );
 }
 
+// ---- Kanban board -----------------------------------------------------------
+
+function PipelineBoard({
+  leads,
+  loading,
+  onMove,
+  onOpen,
+}: {
+  leads: Lead[];
+  loading: boolean;
+  onMove: (id: string, stage: LeadStage) => void;
+  onOpen: (id: string) => void;
+}) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [over, setOver] = useState<LeadStage | null>(null);
+
+  const byStage = useMemo(() => {
+    const g: Record<LeadStage, Lead[]> = { NEW: [], CONTACTED: [], QUALIFIED: [], WON: [], LOST: [] };
+    for (const l of leads) g[l.stage]?.push(l);
+    return g;
+  }, [leads]);
+
+  return (
+    <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, opacity: loading ? 0.6 : 1 }}>
+      {STAGES.map((s) => (
+        <div
+          key={s}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setOver(s);
+          }}
+          onDragLeave={() => setOver((o) => (o === s ? null : o))}
+          onDrop={() => {
+            if (dragId) onMove(dragId, s);
+            setDragId(null);
+            setOver(null);
+          }}
+          style={{
+            flex: '0 0 270px',
+            background: over === s ? '#e6f4ff' : '#fafafa',
+            border: `1px solid ${over === s ? '#91caff' : '#f0f0f0'}`,
+            borderRadius: 8,
+            padding: 8,
+            minHeight: 360,
+            transition: 'background 0.15s',
+          }}
+        >
+          <Space style={{ justifyContent: 'space-between', width: '100%', marginBottom: 8 }}>
+            <Tag color={STAGE_COLOR[s]} style={{ margin: 0 }}>
+              {s}
+            </Tag>
+            <Typography.Text type="secondary">{byStage[s].length}</Typography.Text>
+          </Space>
+
+          {byStage[s].length === 0 ? (
+            <div style={{ textAlign: 'center', color: '#bfbfbf', fontSize: 12, padding: '24px 0' }}>
+              Drop here
+            </div>
+          ) : (
+            byStage[s].map((l) => (
+              <LeadCard
+                key={l.id}
+                lead={l}
+                dragging={dragId === l.id}
+                onDragStart={() => setDragId(l.id)}
+                onDragEnd={() => setDragId(null)}
+                onClick={() => onOpen(l.id)}
+              />
+            ))
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LeadCard({
+  lead,
+  dragging,
+  onDragStart,
+  onDragEnd,
+  onClick,
+}: {
+  lead: Lead;
+  dragging: boolean;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  onClick: () => void;
+}) {
+  const overdue = lead.nextFollowUpAt && dayjs(lead.nextFollowUpAt).isBefore(dayjs());
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={onClick}
+      style={{
+        background: '#fff',
+        border: '1px solid #f0f0f0',
+        borderRadius: 6,
+        padding: '8px 10px',
+        marginBottom: 8,
+        cursor: 'grab',
+        opacity: dragging ? 0.4 : 1,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+      }}
+    >
+      <div style={{ fontWeight: 600, marginBottom: 2 }}>{lead.shopName}</div>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        {lead.contactName ?? '—'} · {lead.phone}
+      </Typography.Text>
+      <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        {lead.estValuePaise > 0 && <Tag style={{ margin: 0 }}>{formatPaise(lead.estValuePaise)}</Tag>}
+        {lead.source === 'SIGNUP' && (
+          <Tag color="purple" style={{ margin: 0 }}>
+            Sign-up
+          </Tag>
+        )}
+        {lead.nextFollowUpAt && (
+          <Tag color={overdue ? 'red' : 'default'} style={{ margin: 0 }}>
+            {dayjs(lead.nextFollowUpAt).format('DD MMM')}
+          </Tag>
+        )}
+        {lead.assignedTo && (
+          <Tooltip title={lead.assignedTo.name}>
+            <Avatar size={20} style={{ background: '#1677ff', fontSize: 10, marginLeft: 'auto' }}>
+              {initials(lead.assignedTo.name)}
+            </Avatar>
+          </Tooltip>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---- Table view -------------------------------------------------------------
+
+function LeadsTable({
+  data,
+  loading,
+  page,
+  counts,
+  stage,
+  onStage,
+  onPage,
+  onChangeStage,
+  onOpen,
+}: {
+  data: LeadsResponse | undefined;
+  loading: boolean;
+  page: number;
+  counts: Record<string, number>;
+  stage: LeadStage | undefined;
+  onStage: (s: LeadStage | undefined) => void;
+  onPage: (p: number) => void;
+  onChangeStage: (id: string, s: LeadStage) => void;
+  onOpen: (id: string) => void;
+}) {
+  const columns: ColumnsType<Lead> = [
+    {
+      title: 'Shop',
+      key: 'shop',
+      render: (_, l) => (
+        <Button type="link" style={{ padding: 0, height: 'auto' }} onClick={() => onOpen(l.id)}>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontWeight: 600 }}>{l.shopName}</div>
+            <Typography.Text type="secondary">
+              {l.contactName ?? '—'} · {l.phone}
+            </Typography.Text>
+          </div>
+        </Button>
+      ),
+    },
+    {
+      title: 'Source',
+      key: 'source',
+      render: (_, l) => <Tag>{l.source === 'SIGNUP' ? 'Sign-up' : 'Prospect'}</Tag>,
+    },
+    {
+      title: 'Owner',
+      key: 'owner',
+      render: (_, l) => (l.assignedTo ? l.assignedTo.name : <Typography.Text type="secondary">Unassigned</Typography.Text>),
+    },
+    { title: 'City', dataIndex: 'city', key: 'city', render: (c?: string) => c ?? '—' },
+    {
+      title: 'Value',
+      key: 'value',
+      render: (_, l) => (l.estValuePaise > 0 ? formatPaise(l.estValuePaise) : '—'),
+    },
+    {
+      title: 'Follow-up',
+      key: 'followup',
+      render: (_, l) =>
+        l.nextFollowUpAt ? (
+          <Tag color={dayjs(l.nextFollowUpAt).isBefore(dayjs()) ? 'red' : 'default'}>
+            {dayjs(l.nextFollowUpAt).format('DD MMM')}
+          </Tag>
+        ) : (
+          '—'
+        ),
+    },
+    {
+      title: 'Stage',
+      key: 'stage',
+      render: (_, l) => (
+        <Select<LeadStage>
+          size="small"
+          value={l.stage}
+          style={{ width: 130 }}
+          onChange={(s) => onChangeStage(l.id, s)}
+          options={STAGES.map((s) => ({ value: s, label: <Tag color={STAGE_COLOR[s]}>{s}</Tag> }))}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <Space wrap style={{ marginBottom: 16 }}>
+        <Button type={stage === undefined ? 'primary' : 'default'} onClick={() => onStage(undefined)}>
+          All
+        </Button>
+        {STAGES.map((s) => (
+          <Button key={s} type={stage === s ? 'primary' : 'default'} onClick={() => onStage(s)}>
+            {s} {counts[s] ? `(${counts[s]})` : ''}
+          </Button>
+        ))}
+      </Space>
+
+      <Table<Lead>
+        rowKey="id"
+        loading={loading}
+        columns={columns}
+        dataSource={data?.items ?? []}
+        pagination={{
+          current: page,
+          pageSize: 10,
+          total: data?.pagination.total ?? 0,
+          onChange: onPage,
+          showSizeChanger: false,
+        }}
+      />
+    </>
+  );
+}
+
+// ---- Source analytics -------------------------------------------------------
+
+const SOURCE_LABEL: Record<LeadSource, string> = { MANUAL: 'Prospecting', SIGNUP: 'Self sign-up' };
+
+function SourceAnalyticsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { data, isLoading } = useSourceAnalytics(open);
+  const columns: ColumnsType<SourceAnalyticsRow> = [
+    { title: 'Source', dataIndex: 'source', key: 'source', render: (s: LeadSource) => SOURCE_LABEL[s] ?? s },
+    { title: 'Leads', dataIndex: 'total', key: 'total' },
+    { title: 'Won', dataIndex: 'won', key: 'won' },
+    {
+      title: 'Conversion',
+      key: 'rate',
+      render: (_, r) => <Progress percent={r.conversionRate} size="small" style={{ width: 160 }} />,
+    },
+  ];
+  return (
+    <Modal title="Lead sources — conversion" open={open} onCancel={onClose} footer={null} width={560}>
+      <Table<SourceAnalyticsRow>
+        rowKey="source"
+        size="small"
+        loading={isLoading}
+        columns={columns}
+        dataSource={data ?? []}
+        pagination={false}
+        locale={{ emptyText: 'No leads yet' }}
+      />
+    </Modal>
+  );
+}
+
+// ---- Lead detail drawer -----------------------------------------------------
+
 function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: () => void; onChanged: () => void }) {
   const qc = useQueryClient();
   const { data: lead, isLoading } = useLead(id);
+  const { data: users } = useUsers();
+  const me = useAuthStore((s) => s.user);
   const [actForm] = Form.useForm();
 
   const reload = () => {
     qc.invalidateQueries({ queryKey: ['lead', id] });
     onChanged();
+  };
+
+  const assign = async (assignedToId: string | null) => {
+    if (!lead) return;
+    try {
+      await updateLead(lead.id, { assignedToId });
+      message.success(assignedToId ? 'Assigned' : 'Unassigned');
+      reload();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed');
+    }
   };
 
   const logActivity = async () => {
@@ -268,6 +574,8 @@ function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
     }
   };
 
+  const assignable = (users ?? []).filter((u) => u.isActive);
+
   return (
     <Drawer
       title={lead ? lead.shopName : 'Lead'}
@@ -282,7 +590,6 @@ function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
             <Tag color={STAGE_COLOR[lead.stage]}>{lead.stage}</Tag>
             <Tag>{lead.source === 'SIGNUP' ? 'Sign-up' : 'Prospect'}</Tag>
             {lead.store && <Tag color="blue">{lead.store.city}</Tag>}
-            {lead.assignedTo && <Tag>{lead.assignedTo.name}</Tag>}
           </Space>
           <Typography.Text type="secondary">
             {lead.contactName ?? '—'} · {lead.phone}
@@ -290,15 +597,31 @@ function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
             {lead.estValuePaise > 0 ? ` · est. ${formatPaise(lead.estValuePaise)}` : ''}
           </Typography.Text>
 
+          <Card size="small" title="Owner">
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Select
+                allowClear
+                placeholder="Unassigned"
+                style={{ width: '100%' }}
+                value={lead.assignedTo?.id ?? undefined}
+                onChange={(v) => assign(v ?? null)}
+                options={assignable.map((u) => ({ value: u.id, label: `${u.name} (${u.role})` }))}
+              />
+              {me && lead.assignedTo?.id !== me.id && (
+                <Button size="small" onClick={() => assign(me.id)}>
+                  Assign to me
+                </Button>
+              )}
+            </Space>
+          </Card>
+
           {lead.stage !== 'WON' && (
             <Button type="primary" ghost onClick={convert}>
               {lead.customerId ? 'Mark won' : 'Convert to customer'}
             </Button>
           )}
           {lead.customer && (
-            <Typography.Text type="secondary">
-              Linked customer · {lead.customer.status}
-            </Typography.Text>
+            <Typography.Text type="secondary">Linked customer · {lead.customer.status}</Typography.Text>
           )}
 
           <Card size="small" title="Log activity">
