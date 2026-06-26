@@ -249,4 +249,30 @@ export interface Customer {
   storeId?: string | null;
   store?: StoreSummary | null;
   _count?: { orders: number };
+  // RFM enrichment attached by the customer list endpoint.
+  segment?: CustomerSegment;
+  ltvPaise?: number;
+  orderCount?: number;
+  lastOrderAt?: string | null;
+}
+
+export type CustomerSegment = 'NEW' | 'ACTIVE' | 'HIGH_VALUE' | 'AT_RISK' | 'DORMANT';
+
+export interface CustomerInsights {
+  customerId: string;
+  shopName: string;
+  segment: CustomerSegment;
+  orderCount: number;
+  ltvPaise: number;
+  aovPaise: number;
+  firstOrderAt?: string | null;
+  lastOrderAt?: string | null;
+  daysSinceLastOrder?: number | null;
+  avgDaysBetweenOrders?: number | null;
+  outstandingPaise: number;
+  overduePaise: number;
+  onTimePaymentRate?: number | null;
+  creditLimitPaise: number;
+  creditApproved: boolean;
+  topCategories: { name: string; spendPaise: number }[];
 }

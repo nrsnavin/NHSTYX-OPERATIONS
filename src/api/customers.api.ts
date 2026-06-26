@@ -1,6 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './axios';
-import type { ApiEnvelope, Customer, CustomerStatus, PaginatedResponse } from '../types';
+import type {
+  ApiEnvelope,
+  Customer,
+  CustomerInsights,
+  CustomerStatus,
+  PaginatedResponse,
+} from '../types';
 
 interface CustomerQuery {
   page?: number;
@@ -36,6 +42,30 @@ export async function approveCustomer(id: string, input: ApproveInput = {}): Pro
 
 export async function rejectCustomer(id: string, reason?: string): Promise<Customer> {
   const { data } = await api.post<ApiEnvelope<Customer>>(`/customers/${id}/reject`, { reason });
+  return data.data;
+}
+
+/** Customer 360 metrics (RFM, spend, credit, top categories). */
+export function useCustomerInsights(id?: string) {
+  return useQuery({
+    queryKey: ['customer-insights', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data } = await api.get<ApiEnvelope<CustomerInsights>>(`/customers/${id}/insights`);
+      return data.data;
+    },
+  });
+}
+
+/** Mint a single-use win-back coupon for a shop; returns the code. */
+export async function winbackCustomer(
+  id: string,
+  percent?: number,
+): Promise<{ code: string; percent: number; endsAt?: string | null }> {
+  const { data } = await api.post<ApiEnvelope<{ code: string; percent: number; endsAt?: string }>>(
+    `/customers/${id}/winback`,
+    { percent },
+  );
   return data.data;
 }
 

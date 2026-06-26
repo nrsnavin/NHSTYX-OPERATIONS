@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   Button,
   Card,
+  Descriptions,
   Drawer,
   Empty,
   Form,
@@ -25,16 +26,26 @@ import {
   approveCustomer,
   rejectCustomer,
   updateCustomer,
+  useCustomerInsights,
   useCustomers,
+  winbackCustomer,
 } from '../api/customers.api';
 import { addActivity, fetchActivities } from '../api/crm.api';
 import { formatPaise } from '../lib/money';
-import type { Customer, CustomerStatus } from '../types';
+import type { Customer, CustomerSegment, CustomerStatus } from '../types';
 
 const STATUS_TAG: Record<CustomerStatus, { color: string; label: string }> = {
   PENDING: { color: 'orange', label: 'Pending' },
   APPROVED: { color: 'green', label: 'Approved' },
   REJECTED: { color: 'red', label: 'Rejected' },
+};
+
+const SEGMENT_TAG: Record<CustomerSegment, { color: string; label: string }> = {
+  NEW: { color: 'default', label: 'New' },
+  ACTIVE: { color: 'blue', label: 'Active' },
+  HIGH_VALUE: { color: 'gold', label: 'High value' },
+  AT_RISK: { color: 'orange', label: 'At risk' },
+  DORMANT: { color: 'red', label: 'Dormant' },
 };
 
 interface CreditForm {
@@ -49,6 +60,7 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CustomerStatus | undefined>(undefined);
   const [notesFor, setNotesFor] = useState<Customer | null>(null);
+  const [insightsFor, setInsightsFor] = useState<Customer | null>(null);
   const { data, isLoading } = useCustomers({
     page,
     limit: 10,
@@ -140,9 +152,22 @@ export function CustomersPage() {
         ),
     },
     {
-      title: 'Orders',
-      key: 'orders',
-      render: (_, r) => r._count?.orders ?? 0,
+      title: 'Value',
+      key: 'value',
+      render: (_, r) => {
+        const seg = r.segment ? SEGMENT_TAG[r.segment] : null;
+        return (
+          <div>
+            {seg && <Tag color={seg.color}>{seg.label}</Tag>}
+            <div>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {r.orderCount ?? 0} orders · {formatPaise(r.ltvPaise ?? 0)}
+                {r.lastOrderAt ? ` · last ${dayjs(r.lastOrderAt).format('DD MMM')}` : ''}
+              </Typography.Text>
+            </div>
+          </div>
+        );
+      },
     },
     {
       title: 'Actions',
@@ -173,6 +198,9 @@ export function CustomersPage() {
           ) : (
             <Typography.Text type="secondary">{r.rejectionReason ?? 'Rejected'}</Typography.Text>
           )}
+          <Button size="small" type="link" onClick={() => setInsightsFor(r)}>
+            360
+          </Button>
           <Button size="small" type="link" onClick={() => setNotesFor(r)}>
             Notes
           </Button>
@@ -272,7 +300,103 @@ export function CustomersPage() {
       </Modal>
 
       <CustomerNotesDrawer customer={notesFor} onClose={() => setNotesFor(null)} />
+      <Customer360Drawer customer={insightsFor} onClose={() => setInsightsFor(null)} />
     </Card>
+  );
+}
+
+function Customer360Drawer({ customer, onClose }: { customer: Customer | null; onClose: () => void }) {
+  const { data, isLoading } = useCustomerInsights(customer?.id);
+  const [winback, setWinback] = useState<{ code: string; percent: number } | null>(null);
+  const [issuing, setIssuing] = useState(false);
+
+  const issue = async () => {
+    if (!customer) return;
+    setIssuing(true);
+    try {
+      const res = await winbackCustomer(customer.id, 10);
+      setWinback(res);
+      message.success(`Win-back coupon ${res.code} created`);
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed');
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  const seg = data ? SEGMENT_TAG[data.segment] : null;
+
+  return (
+    <Drawer
+      title={customer ? `Customer 360 · ${customer.shopName}` : 'Customer 360'}
+      width={520}
+      open={Boolean(customer)}
+      onClose={() => {
+        setWinback(null);
+        onClose();
+      }}
+    >
+      {isLoading || !data ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="Loading…" />
+      ) : (
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <Space>
+            {seg && <Tag color={seg.color}>{seg.label}</Tag>}
+            <Typography.Text type="secondary">
+              {data.creditApproved ? `Credit ${formatPaise(data.creditLimitPaise)}` : 'No credit'}
+            </Typography.Text>
+          </Space>
+
+          <Descriptions column={2} size="small" bordered>
+            <Descriptions.Item label="Lifetime value">{formatPaise(data.ltvPaise)}</Descriptions.Item>
+            <Descriptions.Item label="Orders">{data.orderCount}</Descriptions.Item>
+            <Descriptions.Item label="Avg order">{formatPaise(data.aovPaise)}</Descriptions.Item>
+            <Descriptions.Item label="Order cadence">
+              {data.avgDaysBetweenOrders != null ? `~${data.avgDaysBetweenOrders}d` : '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Last order">
+              {data.lastOrderAt
+                ? `${dayjs(data.lastOrderAt).format('DD MMM YYYY')} (${data.daysSinceLastOrder}d ago)`
+                : 'Never'}
+            </Descriptions.Item>
+            <Descriptions.Item label="On-time pay">
+              {data.onTimePaymentRate != null ? `${data.onTimePaymentRate}%` : '—'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Outstanding">{formatPaise(data.outstandingPaise)}</Descriptions.Item>
+            <Descriptions.Item label="Overdue">
+              <Typography.Text type={data.overduePaise > 0 ? 'danger' : undefined}>
+                {formatPaise(data.overduePaise)}
+              </Typography.Text>
+            </Descriptions.Item>
+          </Descriptions>
+
+          {data.topCategories.length > 0 && (
+            <div>
+              <Typography.Text strong>Top categories</Typography.Text>
+              <div style={{ marginTop: 6 }}>
+                {data.topCategories.map((c) => (
+                  <Tag key={c.name} style={{ marginBottom: 4 }}>
+                    {c.name} · {formatPaise(c.spendPaise)}
+                  </Tag>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <Button type="primary" onClick={issue} loading={issuing}>
+              Create win-back offer (10% off)
+            </Button>
+            {winback && (
+              <Typography.Paragraph style={{ marginTop: 10 }}>
+                Share code <Typography.Text strong copyable>{winback.code}</Typography.Text> with{' '}
+                {customer?.shopName} — single use, valid 30 days.
+              </Typography.Paragraph>
+            )}
+          </div>
+        </Space>
+      )}
+    </Drawer>
   );
 }
 
