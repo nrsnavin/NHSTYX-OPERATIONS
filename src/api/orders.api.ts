@@ -29,6 +29,37 @@ export function useUpdateOrderStatus() {
   });
 }
 
+export interface ShipInput {
+  id: string;
+  courierName?: string;
+  trackingNumber?: string;
+  trackingUrl?: string;
+}
+
+/** Records a dispatch (courier + AWB) and flips the order to SHIPPED. */
+export function useShipOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: ShipInput) => api.post(`/orders/${id}/ship`, body),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['order', v.id] });
+    },
+  });
+}
+
+/** Marks an order delivered. */
+export function useDeliverOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/orders/${id}/deliver`),
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['order', id] });
+    },
+  });
+}
+
 export async function fetchOrder(id: string): Promise<Order> {
   const { data } = await api.get<ApiEnvelope<Order>>(`/orders/${id}`);
   return data.data;

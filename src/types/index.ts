@@ -148,7 +148,10 @@ export type PaymentMethod = 'RAZORPAY' | 'COD' | 'CREDIT' | 'BANK_TRANSFER';
 
 export interface OrderItem {
   id: string;
+  productId?: string;
+  variantId?: string | null;
   productName: string;
+  variantName?: string | null;
   quantity: number;
   unitPricePaise: number;
   lineTotalPaise: number;
@@ -185,6 +188,54 @@ export interface Order {
   items: OrderItem[];
   payments?: Payment[];
   events?: OrderEvent[];
+  returns?: OrderReturn[];
+  // Shipment tracking (set when dispatched).
+  courierName?: string | null;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
+  createdAt: string;
+}
+
+export type ReturnStatus = 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'REFUNDED' | 'CANCELLED';
+
+export interface OrderReturnItem {
+  id: string;
+  orderItemId: string;
+  quantity: number;
+  unitPricePaise: number;
+  lineRefundPaise: number;
+  orderItem?: OrderItem;
+}
+
+export interface OrderReturn {
+  id: string;
+  returnNumber: string;
+  orderId: string;
+  status: ReturnStatus;
+  reason?: string | null;
+  refundAmountPaise: number;
+  refundMethod?: PaymentMethod | null;
+  refundReference?: string | null;
+  restocked: boolean;
+  createdAt: string;
+  processedAt?: string | null;
+  items: OrderReturnItem[];
+  order?: { orderNumber: string; totalPaise: number; paymentMethod: PaymentMethod };
+  customer?: { shopName: string; phone: string };
+}
+
+export type NotificationAudience = 'CUSTOMER' | 'STAFF';
+
+export interface AppNotification {
+  id: string;
+  audience: NotificationAudience;
+  event: string;
+  title: string;
+  body: string;
+  orderId?: string | null;
+  status: 'SENT' | 'READ' | 'FAILED';
   createdAt: string;
 }
 

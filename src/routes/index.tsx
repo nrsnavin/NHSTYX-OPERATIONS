@@ -9,6 +9,7 @@ import { LeadsPage } from '../pages/LeadsPage';
 import { QuotationsPage } from '../pages/QuotationsPage';
 import { PurchasingPage } from '../pages/PurchasingPage';
 import { OrdersPage } from '../pages/OrdersPage';
+import { ReturnsPage } from '../pages/ReturnsPage';
 import { CustomersPage } from '../pages/CustomersPage';
 import { StaffPage } from '../pages/StaffPage';
 import { AuditPage } from '../pages/AuditPage';
@@ -27,6 +28,7 @@ export function AppRoutes() {
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/stores" element={<StoresPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/returns" element={<ReturnsPage />} />
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/quotations" element={<QuotationsPage />} />
           <Route path="/purchasing" element={<PurchasingPage />} />

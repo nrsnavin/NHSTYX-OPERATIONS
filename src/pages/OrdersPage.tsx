@@ -26,9 +26,11 @@ import dayjs from 'dayjs';
 import {
   createOrderForCustomer,
   openInvoice,
+  useDeliverOrder,
   useOrder,
   useOrders,
   useRecordPayment,
+  useShipOrder,
   useUpdateOrderStatus,
 } from '../api/orders.api';
 import { useCustomers } from '../api/customers.api';
@@ -358,6 +360,19 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
   const { data: order, isLoading } = useOrder(id);
   const updateStatus = useUpdateOrderStatus();
   const recordPayment = useRecordPayment();
+  const shipOrder = useShipOrder();
+  const deliverOrder = useDeliverOrder();
+  const [shipOpen, setShipOpen] = useState(false);
+
+  const markDelivered = async () => {
+    if (!order) return;
+    try {
+      await deliverOrder.mutateAsync(order.id);
+      message.success('Marked delivered');
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed');
+    }
+  };
 
   const confirmBankPayment = async () => {
     if (!order) return;
@@ -464,6 +479,50 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
             </Descriptions.Item>
           </Descriptions>
 
+          {order.status !== 'CANCELLED' && order.status !== 'RETURNED' && (
+            <>
+              <Divider style={{ margin: '4px 0' }}>Fulfilment</Divider>
+              {order.trackingNumber ? (
+                <Descriptions size="small" column={1} bordered>
+                  <Descriptions.Item label="Courier">{order.courierName ?? '—'}</Descriptions.Item>
+                  <Descriptions.Item label="AWB / Tracking">
+                    {order.trackingUrl ? (
+                      <a href={order.trackingUrl} target="_blank" rel="noreferrer">
+                        {order.trackingNumber}
+                      </a>
+                    ) : (
+                      order.trackingNumber
+                    )}
+                  </Descriptions.Item>
+                  {order.shippedAt && (
+                    <Descriptions.Item label="Shipped">
+                      {dayjs(order.shippedAt).format('DD MMM, h:mm a')}
+                    </Descriptions.Item>
+                  )}
+                  {order.deliveredAt && (
+                    <Descriptions.Item label="Delivered">
+                      {dayjs(order.deliveredAt).format('DD MMM, h:mm a')}
+                    </Descriptions.Item>
+                  )}
+                </Descriptions>
+              ) : (
+                <Typography.Text type="secondary">Not dispatched yet.</Typography.Text>
+              )}
+              <Space>
+                {order.status !== 'DELIVERED' && (
+                  <Button type="primary" onClick={() => setShipOpen(true)}>
+                    {order.trackingNumber ? 'Update shipment' : 'Mark shipped'}
+                  </Button>
+                )}
+                {order.status === 'SHIPPED' && (
+                  <Popconfirm title="Mark this order delivered?" onConfirm={markDelivered} okText="Mark delivered">
+                    <Button loading={deliverOrder.isPending}>Mark delivered</Button>
+                  </Popconfirm>
+                )}
+              </Space>
+            </>
+          )}
+
           <Divider style={{ margin: '4px 0' }}>Items</Divider>
           {order.items.map((it) => (
             <Space key={it.id} style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -509,8 +568,97 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
               />
             </>
           )}
+
+          {order.returns && order.returns.length > 0 && (
+            <>
+              <Divider style={{ margin: '4px 0' }}>Returns</Divider>
+              {order.returns.map((r) => (
+                <Space key={r.id} style={{ justifyContent: 'space-between', width: '100%' }}>
+                  <span>
+                    {r.returnNumber} · <Tag color={RETURN_COLORS[r.status]}>{r.status}</Tag>
+                  </span>
+                  <span>{formatPaise(r.refundAmountPaise)}</span>
+                </Space>
+              ))}
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Process refunds from the Returns page.
+              </Typography.Text>
+            </>
+          )}
         </Space>
       )}
+      <ShipModal open={shipOpen} order={order ?? null} ship={shipOrder} onClose={() => setShipOpen(false)} />
     </Drawer>
+  );
+}
+
+const RETURN_COLORS: Record<string, string> = {
+  REQUESTED: 'gold',
+  APPROVED: 'blue',
+  REJECTED: 'red',
+  REFUNDED: 'green',
+  CANCELLED: 'default',
+};
+
+/** Records courier + AWB and flips the order to SHIPPED. */
+function ShipModal({
+  open,
+  order,
+  ship,
+  onClose,
+}: {
+  open: boolean;
+  order: Order | null;
+  ship: ReturnType<typeof useShipOrder>;
+  onClose: () => void;
+}) {
+  const [form] = Form.useForm();
+  if (!order) return null;
+  const submit = async () => {
+    const v = await form.validateFields();
+    try {
+      await ship.mutateAsync({
+        id: order.id,
+        courierName: v.courierName?.trim() || undefined,
+        trackingNumber: v.trackingNumber?.trim() || undefined,
+        trackingUrl: v.trackingUrl?.trim() || undefined,
+      });
+      message.success(`Order ${order.orderNumber} marked shipped`);
+      form.resetFields();
+      onClose();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed to record shipment');
+    }
+  };
+  return (
+    <Modal
+      title={`Ship ${order.orderNumber}`}
+      open={open}
+      onOk={submit}
+      confirmLoading={ship.isPending}
+      onCancel={onClose}
+      okText="Mark shipped"
+      destroyOnClose
+    >
+      <Form
+        form={form}
+        layout="vertical"
+        initialValues={{
+          courierName: order.courierName ?? '',
+          trackingNumber: order.trackingNumber ?? '',
+          trackingUrl: order.trackingUrl ?? '',
+        }}
+      >
+        <Form.Item name="courierName" label="Courier">
+          <Input placeholder="e.g. Delhivery, Blue Dart" />
+        </Form.Item>
+        <Form.Item name="trackingNumber" label="AWB / Tracking number">
+          <Input placeholder="Consignment number" />
+        </Form.Item>
+        <Form.Item name="trackingUrl" label="Tracking URL (optional)" rules={[{ type: 'url', message: 'Enter a valid URL' }]}>
+          <Input placeholder="https://…" />
+        </Form.Item>
+      </Form>
+    </Modal>
   );
 }

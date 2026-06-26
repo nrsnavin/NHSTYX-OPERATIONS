@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Avatar, Badge, Dropdown, Layout, Menu, Tag, Typography } from 'antd';
+import { Avatar, Badge, Button, Dropdown, Layout, Menu, Tag, Typography } from 'antd';
+import dayjs from 'dayjs';
 import {
   AppstoreOutlined,
+  BellOutlined,
   DashboardOutlined,
   FileTextOutlined,
   FunnelPlotOutlined,
   InboxOutlined,
   LogoutOutlined,
+  RollbackOutlined,
   SafetyCertificateOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
@@ -17,6 +20,7 @@ import {
 } from '@ant-design/icons';
 import { useAuthStore } from '../store/auth.store';
 import { useLowStock } from '../api/purchasing.api';
+import { useStaffNotifications } from '../api/notifications.api';
 import { logout as apiLogout } from '../api/auth.api';
 import type { Role } from '../types';
 
@@ -34,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/products', label: 'Catalog', icon: <AppstoreOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/stores', label: 'Stores', icon: <ShopOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/orders', label: 'Orders', icon: <ShoppingCartOutlined />, roles: ['ADMIN', 'AGENT'] },
+  { key: '/returns', label: 'Returns', icon: <RollbackOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/purchasing', label: 'Purchasing', icon: <InboxOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/leads', label: 'Leads', icon: <FunnelPlotOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/quotations', label: 'Quotations', icon: <FileTextOutlined />, roles: ['ADMIN', 'AGENT'] },
@@ -94,6 +99,37 @@ function Brand({ collapsed }: { collapsed: boolean }) {
         </div>
       )}
     </Link>
+  );
+}
+
+/** Header bell showing the staff activity stream (new orders, payments, returns). */
+function NotificationsBell() {
+  const { data } = useStaffNotifications();
+  const items = data ?? [];
+  const recent = items.filter((n) => dayjs().diff(dayjs(n.createdAt), 'hour') < 24).length;
+  const menu = {
+    items:
+      items.length === 0
+        ? [{ key: 'empty', label: 'No notifications yet', disabled: true }]
+        : items.slice(0, 10).map((n) => ({
+            key: n.id,
+            label: (
+              <div style={{ maxWidth: 300, whiteSpace: 'normal', padding: '2px 0' }}>
+                <div style={{ fontWeight: 600 }}>{n.title}</div>
+                <div style={{ fontSize: 12, color: '#777' }}>{n.body}</div>
+                <div style={{ fontSize: 11, color: '#aaa' }}>
+                  {dayjs(n.createdAt).format('DD MMM, h:mm a')}
+                </div>
+              </div>
+            ),
+          })),
+  };
+  return (
+    <Dropdown menu={menu} trigger={['click']} placement="bottomRight">
+      <Badge count={recent} size="small" overflowCount={9}>
+        <Button type="text" icon={<BellOutlined style={{ fontSize: 18 }} />} />
+      </Badge>
+    </Dropdown>
   );
 }
 
@@ -188,6 +224,8 @@ export function DashboardLayout() {
         >
           <Typography.Text style={{ fontSize: 17, fontWeight: 700 }}>{currentTitle}</Typography.Text>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <NotificationsBell />
           <Dropdown
             menu={{
               items: [
@@ -220,6 +258,7 @@ export function DashboardLayout() {
               </div>
             </div>
           </Dropdown>
+          </div>
         </Header>
 
         <Content style={{ margin: 24 }}>
