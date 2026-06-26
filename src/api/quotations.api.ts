@@ -83,3 +83,11 @@ export async function convertQuotation(
   );
   return data.data;
 }
+
+/** Opens the quotation PDF in a new tab. */
+export async function openQuotationPdf(id: string): Promise<void> {
+  const res = await api.get(`/quotations/${id}/pdf`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data as Blob);
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

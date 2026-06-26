@@ -20,12 +20,13 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CopyOutlined, MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import { CopyOutlined, FilePdfOutlined, MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   convertQuotation,
   createQuotation,
+  openQuotationPdf,
   setQuotationStatus,
   updateQuotation,
   useQuotation,
@@ -507,9 +508,17 @@ function QuotationDrawer({
       loading={isLoading}
       extra={
         quote ? (
-          <Button icon={<CopyOutlined />} onClick={copyShare}>
-            Copy / share
-          </Button>
+          <Space>
+            <Button
+              icon={<FilePdfOutlined />}
+              onClick={() => openQuotationPdf(quote.id).catch((e) => message.error((e as Error).message ?? 'Failed'))}
+            >
+              PDF
+            </Button>
+            <Button icon={<CopyOutlined />} onClick={copyShare}>
+              Copy / share
+            </Button>
+          </Space>
         ) : null
       }
     >
