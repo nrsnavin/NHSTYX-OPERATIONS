@@ -2,6 +2,34 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from './axios';
 import type { ApiEnvelope, PaginatedResponse, Product, ProductUnit } from '../types';
 
+export interface ProductMovement {
+  id: string;
+  deltaQty: number;
+  type: 'SALE' | 'RESTOCK' | 'ADJUSTMENT' | 'RELEASE';
+  reason?: string | null;
+  createdAt: string;
+  store?: { name: string; code: string } | null;
+  variant?: { name: string } | null;
+  user?: { name: string } | null;
+  order?: { orderNumber: string } | null;
+}
+
+/** Stock-movement ledger for a single product (across stores for admins,
+ *  scoped to the agent's store otherwise). */
+export function useProductMovements(productId?: string) {
+  return useQuery({
+    queryKey: ['product-movements', productId],
+    enabled: !!productId,
+    queryFn: async () => {
+      const { data } = await api.get<PaginatedResponse<ProductMovement>>(
+        `/products/${productId}/movements`,
+        { params: { limit: 100 } },
+      );
+      return data.items;
+    },
+  });
+}
+
 interface ProductQuery {
   page?: number;
   limit?: number;
