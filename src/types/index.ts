@@ -272,8 +272,16 @@ export interface Activity {
   type: ActivityType;
   body: string;
   followUpAt?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   createdBy?: { id: string; name: string } | null;
   createdAt: string;
+}
+
+/** A VISIT activity with a GPS check-in, for the field-visit log. */
+export interface FieldVisit extends Activity {
+  lead?: { id: string; shopName: string; city?: string | null } | null;
+  customer?: { id: string; shopName: string } | null;
 }
 
 export interface Lead {

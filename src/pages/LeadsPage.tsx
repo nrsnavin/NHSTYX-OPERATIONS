@@ -22,7 +22,7 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { BarChartOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
+import { BarChartOutlined, EnvironmentOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -33,12 +33,13 @@ import {
   useLead,
   useLeads,
   useSourceAnalytics,
+  useVisits,
   type LeadsResponse,
 } from '../api/crm.api';
 import { useUsers } from '../api/users.api';
 import { useAuthStore } from '../store/auth.store';
 import { formatPaise } from '../lib/money';
-import type { ActivityType, Lead, LeadSource, LeadStage, SourceAnalyticsRow } from '../types';
+import type { ActivityType, FieldVisit, Lead, LeadSource, LeadStage, SourceAnalyticsRow } from '../types';
 
 const STAGES: LeadStage[] = ['NEW', 'CONTACTED', 'QUALIFIED', 'WON', 'LOST'];
 const STAGE_COLOR: Record<LeadStage, string> = {
@@ -72,6 +73,7 @@ export function LeadsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [visitsOpen, setVisitsOpen] = useState(false);
   const [form] = Form.useForm();
 
   const assignedToId = mine && me ? me.id : undefined;
@@ -168,6 +170,9 @@ export function LeadsPage() {
       }
       extra={
         <Space>
+          <Button icon={<EnvironmentOutlined />} onClick={() => setVisitsOpen(true)}>
+            Field visits
+          </Button>
           <Button icon={<BarChartOutlined />} onClick={() => setAnalyticsOpen(true)}>
             Sources
           </Button>
@@ -238,6 +243,7 @@ export function LeadsPage() {
       </Modal>
 
       <SourceAnalyticsModal open={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
+      <FieldVisitsModal open={visitsOpen} onClose={() => setVisitsOpen(false)} />
       <LeadDrawer id={selected} onClose={() => setSelected(null)} onChanged={refresh} />
     </Card>
   );
@@ -520,6 +526,55 @@ function SourceAnalyticsModal({ open, onClose }: { open: boolean; onClose: () =>
   );
 }
 
+// ---- Field-visit log --------------------------------------------------------
+
+function FieldVisitsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { data, isLoading } = useVisits(30, open);
+  const columns: ColumnsType<FieldVisit> = [
+    {
+      title: 'When',
+      key: 'when',
+      render: (_, v) => dayjs(v.createdAt).format('DD MMM, HH:mm'),
+    },
+    {
+      title: 'Shop',
+      key: 'shop',
+      render: (_, v) => v.lead?.shopName ?? v.customer?.shopName ?? '—',
+    },
+    { title: 'Agent', key: 'agent', render: (_, v) => v.createdBy?.name ?? '—' },
+    { title: 'Notes', dataIndex: 'body', key: 'body', ellipsis: true },
+    {
+      title: 'Location',
+      key: 'loc',
+      render: (_, v) =>
+        v.latitude != null && v.longitude != null ? (
+          <a
+            href={`https://www.google.com/maps?q=${v.latitude},${v.longitude}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <EnvironmentOutlined /> Map
+          </a>
+        ) : (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ),
+    },
+  ];
+  return (
+    <Modal title="Field visits (last 30 days)" open={open} onCancel={onClose} footer={null} width={720}>
+      <Table<FieldVisit>
+        rowKey="id"
+        size="small"
+        loading={isLoading}
+        columns={columns}
+        dataSource={data ?? []}
+        pagination={{ pageSize: 8, showSizeChanger: false }}
+        locale={{ emptyText: 'No field visits logged yet' }}
+      />
+    </Modal>
+  );
+}
+
 // ---- Lead detail drawer -----------------------------------------------------
 
 function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: () => void; onChanged: () => void }) {
@@ -528,6 +583,28 @@ function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
   const { data: users } = useUsers();
   const me = useAuthStore((s) => s.user);
   const [actForm] = Form.useForm();
+  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoBusy, setGeoBusy] = useState(false);
+
+  const captureGeo = () => {
+    if (!navigator.geolocation) {
+      message.error('Geolocation is not available on this device');
+      return;
+    }
+    setGeoBusy(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeo({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoBusy(false);
+        message.success('Location captured');
+      },
+      (err) => {
+        setGeoBusy(false);
+        message.error(err.message || 'Could not get your location');
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
 
   const reload = () => {
     qc.invalidateQueries({ queryKey: ['lead', id] });
@@ -548,14 +625,18 @@ function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
   const logActivity = async () => {
     if (!lead) return;
     const v = await actForm.validateFields();
+    const isVisit = v.type === 'VISIT';
     try {
       await addActivity({
         type: v.type,
         body: v.body,
         leadId: lead.id,
         followUpAt: v.followUpAt ? v.followUpAt.toISOString() : undefined,
+        latitude: isVisit && geo ? geo.lat : undefined,
+        longitude: isVisit && geo ? geo.lng : undefined,
       });
       actForm.resetFields();
+      setGeo(null);
       message.success('Logged');
       reload();
     } catch (e) {
@@ -634,6 +715,22 @@ function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
                   <DatePicker showTime format="DD MMM HH:mm" style={{ width: 180 }} />
                 </Form.Item>
               </Space>
+              <Form.Item noStyle shouldUpdate={(p, c) => p.type !== c.type}>
+                {() =>
+                  actForm.getFieldValue('type') === 'VISIT' ? (
+                    <div style={{ marginBottom: 12 }}>
+                      <Button size="small" icon={<EnvironmentOutlined />} loading={geoBusy} onClick={captureGeo}>
+                        {geo ? 'Update GPS check-in' : 'Capture GPS check-in'}
+                      </Button>
+                      {geo && (
+                        <Tag color="green" style={{ marginLeft: 8 }}>
+                          {geo.lat.toFixed(5)}, {geo.lng.toFixed(5)}
+                        </Tag>
+                      )}
+                    </div>
+                  ) : null
+                }
+              </Form.Item>
               <Form.Item name="body" rules={[{ required: true, message: 'Add a note' }]}>
                 <Input.TextArea rows={2} placeholder="What happened / next step…" />
               </Form.Item>
@@ -660,8 +757,18 @@ function LeadDrawer({ id, onClose, onChanged }: { id: string | null; onClose: ()
                       </Typography.Text>
                     </Space>
                     <div>{a.body}</div>
+                    {a.latitude != null && a.longitude != null && (
+                      <a
+                        href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontSize: 12 }}
+                      >
+                        <EnvironmentOutlined /> View check-in
+                      </a>
+                    )}
                     {a.followUpAt && (
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
                         ⏰ follow up {dayjs(a.followUpAt).format('DD MMM')}
                       </Typography.Text>
                     )}

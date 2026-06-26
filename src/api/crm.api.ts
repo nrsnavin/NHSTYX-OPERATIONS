@@ -3,6 +3,7 @@ import { api } from './axios';
 import type {
   Activity,
   ApiEnvelope,
+  FieldVisit,
   Lead,
   LeadStage,
   Pagination,
@@ -97,7 +98,20 @@ export async function addActivity(input: {
   leadId?: string;
   customerId?: string;
   followUpAt?: string | null;
+  latitude?: number;
+  longitude?: number;
 }): Promise<Activity> {
   const { data } = await api.post<ApiEnvelope<Activity>>('/crm/activities', input);
   return data.data;
+}
+
+export async function fetchVisits(days = 30): Promise<FieldVisit[]> {
+  const { data } = await api.get<{ success: boolean; items: FieldVisit[] }>('/crm/visits', {
+    params: { days },
+  });
+  return data.items;
+}
+
+export function useVisits(days = 30, enabled = true) {
+  return useQuery({ queryKey: ['crm-visits', days], queryFn: () => fetchVisits(days), enabled });
 }
