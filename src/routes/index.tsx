@@ -13,6 +13,7 @@ import { ReturnsPage } from '../pages/ReturnsPage';
 import { ReceivablesPage } from '../pages/ReceivablesPage';
 import { ReportsPage } from '../pages/ReportsPage';
 import { AgentPerformancePage } from '../pages/AgentPerformancePage';
+import { NotificationsPage } from '../pages/NotificationsPage';
 import { CustomersPage } from '../pages/CustomersPage';
 import { StaffPage } from '../pages/StaffPage';
 import { AuditPage } from '../pages/AuditPage';
@@ -40,6 +41,7 @@ export function AppRoutes() {
           <Route path="/receivables" element={<ReceivablesPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/agent-performance" element={<AgentPerformancePage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
         </Route>
       </Route>
 

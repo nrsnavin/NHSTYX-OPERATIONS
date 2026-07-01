@@ -51,6 +51,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/receivables', label: 'Receivables', icon: <AccountBookOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/reports', label: 'Reports', icon: <BarChartOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/agent-performance', label: 'Agent performance', icon: <LineChartOutlined />, roles: ['ADMIN', 'AGENT'] },
+  { key: '/notifications', label: 'Notifications', icon: <BellOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/staff', label: 'Staff', icon: <UserOutlined />, roles: ['ADMIN'] },
   { key: '/coupons', label: 'Coupons', icon: <TagsOutlined />, roles: ['ADMIN'] },
   { key: '/audit', label: 'Audit', icon: <SafetyCertificateOutlined />, roles: ['ADMIN'] },
