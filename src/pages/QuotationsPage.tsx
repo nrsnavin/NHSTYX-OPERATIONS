@@ -20,7 +20,13 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { CopyOutlined, FilePdfOutlined, MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  CopyOutlined,
+  FilePdfOutlined,
+  MinusCircleOutlined,
+  PlusOutlined,
+  SendOutlined,
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -59,6 +65,25 @@ export function QuotationsPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Quotation | null>(null);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  const sendQuote = async (q: Quotation) => {
+    setSendingId(q.id);
+    try {
+      await setQuotationStatus(q.id, 'SENT');
+      qc.invalidateQueries({ queryKey: ['quotations'] });
+      qc.invalidateQueries({ queryKey: ['quotation', q.id] });
+      message.success(
+        q.customer
+          ? `Sent to ${q.customer.shopName} — they can now view and accept it in their app`
+          : 'Marked sent (prospect quote — not visible in a customer app until the lead becomes a customer)',
+      );
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed to send');
+    } finally {
+      setSendingId(null);
+    }
+  };
 
   const { data, isLoading } = useQuotations({
     page,
@@ -120,6 +145,35 @@ export function QuotationsPage() {
       title: 'Created',
       key: 'createdAt',
       render: (_, q) => dayjs(q.createdAt).format('DD MMM'),
+    },
+    {
+      title: '',
+      key: 'actions',
+      render: (_, q) => (
+        <Space size={4}>
+          {q.status === 'DRAFT' && (
+            <Button
+              size="small"
+              type="primary"
+              icon={<SendOutlined />}
+              loading={sendingId === q.id}
+              onClick={() => sendQuote(q)}
+            >
+              Send
+            </Button>
+          )}
+          <Button
+            size="small"
+            type="link"
+            icon={<FilePdfOutlined />}
+            onClick={() =>
+              openQuotationPdf(q.id).catch((e) => message.error((e as Error).message ?? 'Failed'))
+            }
+          >
+            PDF
+          </Button>
+        </Space>
+      ),
     },
   ];
 
@@ -588,8 +642,13 @@ function QuotationDrawer({
                 {quote.status === 'DRAFT' && (
                   <>
                     <Button onClick={() => onEdit(quote)}>Edit</Button>
-                    <Button type="primary" ghost loading={busy} onClick={() => changeStatus('SENT')}>
-                      Mark sent
+                    <Button
+                      type="primary"
+                      icon={<SendOutlined />}
+                      loading={busy}
+                      onClick={() => changeStatus('SENT')}
+                    >
+                      Send to customer
                     </Button>
                   </>
                 )}
