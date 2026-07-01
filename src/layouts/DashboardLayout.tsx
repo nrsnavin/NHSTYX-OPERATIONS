@@ -16,6 +16,7 @@ import {
   LogoutOutlined,
   RollbackOutlined,
   SafetyCertificateOutlined,
+  SettingOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
   TagsOutlined,
@@ -53,6 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/staff', label: 'Staff', icon: <UserOutlined />, roles: ['ADMIN'] },
   { key: '/coupons', label: 'Coupons', icon: <TagsOutlined />, roles: ['ADMIN'] },
   { key: '/audit', label: 'Audit', icon: <SafetyCertificateOutlined />, roles: ['ADMIN'] },
+  { key: '/settings', label: 'Settings', icon: <SettingOutlined />, roles: ['ADMIN'] },
 ];
 
 const LINE = '#eef0f3';
