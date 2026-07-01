@@ -11,6 +11,7 @@ import {
   Modal,
   Popconfirm,
   Radio,
+  Select,
   Space,
   Switch,
   Table,
@@ -31,6 +32,8 @@ import {
   winbackCustomer,
 } from '../api/customers.api';
 import { addActivity, fetchActivities } from '../api/crm.api';
+import { useBroadcast } from '../api/notifications.api';
+import { useStores } from '../api/stores.api';
 import { useClearAllCarts } from '../api/cart.api';
 import { useAuthStore } from '../store/auth.store';
 import { formatPaise } from '../lib/money';
@@ -66,6 +69,7 @@ export function CustomersPage() {
   const [status, setStatus] = useState<CustomerStatus | undefined>(undefined);
   const [notesFor, setNotesFor] = useState<Customer | null>(null);
   const [insightsFor, setInsightsFor] = useState<Customer | null>(null);
+  const [messaging, setMessaging] = useState(false);
 
   const onClearAllCarts = async () => {
     try {
@@ -228,6 +232,7 @@ export function CustomersPage() {
       title="Customers"
       extra={
         <Space>
+          <Button onClick={() => setMessaging(true)}>Message customers</Button>
           {isAdmin && (
             <Popconfirm
               title="Clear every customer's cart?"
@@ -326,7 +331,98 @@ export function CustomersPage() {
 
       <CustomerNotesDrawer customer={notesFor} onClose={() => setNotesFor(null)} />
       <Customer360Drawer customer={insightsFor} onClose={() => setInsightsFor(null)} />
+      <BroadcastModal open={messaging} isAdmin={isAdmin} onClose={() => setMessaging(false)} />
     </Card>
+  );
+}
+
+interface BroadcastForm {
+  title: string;
+  body: string;
+  status?: CustomerStatus;
+  storeId?: string;
+}
+
+/** Compose an in-app message and send it to a segment of customers. */
+function BroadcastModal({
+  open,
+  isAdmin,
+  onClose,
+}: {
+  open: boolean;
+  isAdmin: boolean;
+  onClose: () => void;
+}) {
+  const [form] = Form.useForm<BroadcastForm>();
+  const broadcast = useBroadcast();
+  const { data: stores } = useStores();
+
+  const submit = async () => {
+    const v = await form.validateFields();
+    try {
+      const res = await broadcast.mutateAsync({
+        title: v.title.trim(),
+        body: v.body.trim(),
+        status: v.status,
+        storeId: v.storeId,
+      });
+      message.success(
+        res.sent > 0
+          ? `Message sent to ${res.sent} customer${res.sent === 1 ? '' : 's'}`
+          : 'No customers matched that segment',
+      );
+      form.resetFields();
+      onClose();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed to send');
+    }
+  };
+
+  return (
+    <Modal
+      title="Message customers"
+      open={open}
+      onOk={submit}
+      confirmLoading={broadcast.isPending}
+      onCancel={onClose}
+      okText="Send message"
+      destroyOnClose
+    >
+      <Typography.Paragraph type="secondary">
+        Sends an in-app notification to the customers' app. Agents reach their own store's
+        customers; admins can target a specific store.
+      </Typography.Paragraph>
+      <Form form={form} layout="vertical" requiredMark="optional" initialValues={{ status: 'APPROVED' }}>
+        <Form.Item name="title" label="Title" rules={[{ required: true, min: 2, max: 120 }]}>
+          <Input placeholder="New season stock has arrived!" maxLength={120} />
+        </Form.Item>
+        <Form.Item name="body" label="Message" rules={[{ required: true, min: 2, max: 500 }]}>
+          <Input.TextArea rows={3} maxLength={500} placeholder="Fresh kurtis and sarees now in stock — order before Friday for bulk discounts." />
+        </Form.Item>
+        <Space align="start" wrap>
+          <Form.Item name="status" label="Send to" tooltip="Filter by registration status">
+            <Select
+              style={{ width: 180 }}
+              options={[
+                { value: 'APPROVED', label: 'Approved customers' },
+                { value: 'PENDING', label: 'Pending customers' },
+                { value: undefined as unknown as string, label: 'All (any status)' },
+              ]}
+            />
+          </Form.Item>
+          {isAdmin && (
+            <Form.Item name="storeId" label="Store (optional)">
+              <Select
+                allowClear
+                style={{ width: 200 }}
+                placeholder="All stores"
+                options={(stores ?? []).map((s) => ({ value: s.id, label: `${s.name} · ${s.city}` }))}
+              />
+            </Form.Item>
+          )}
+        </Space>
+      </Form>
+    </Modal>
   );
 }
 
