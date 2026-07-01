@@ -19,6 +19,7 @@ import { StaffPage } from '../pages/StaffPage';
 import { AuditPage } from '../pages/AuditPage';
 import { CouponsPage } from '../pages/CouponsPage';
 import { SettingsPage } from '../pages/SettingsPage';
+import { BundlesPage } from '../pages/BundlesPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 
 export function AppRoutes() {
@@ -50,6 +51,7 @@ export function AppRoutes() {
         <Route element={<DashboardLayout />}>
           <Route path="/staff" element={<StaffPage />} />
           <Route path="/coupons" element={<CouponsPage />} />
+          <Route path="/bundles" element={<BundlesPage />} />
           <Route path="/audit" element={<AuditPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>

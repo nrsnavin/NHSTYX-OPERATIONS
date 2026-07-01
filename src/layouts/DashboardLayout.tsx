@@ -6,6 +6,7 @@ import { GlobalSearch } from '../components/GlobalSearch';
 import {
   AppstoreOutlined,
   BellOutlined,
+  BlockOutlined,
   DashboardOutlined,
   FileTextOutlined,
   FunnelPlotOutlined,
@@ -54,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: '/notifications', label: 'Notifications', icon: <BellOutlined />, roles: ['ADMIN', 'AGENT'] },
   { key: '/staff', label: 'Staff', icon: <UserOutlined />, roles: ['ADMIN'] },
   { key: '/coupons', label: 'Coupons', icon: <TagsOutlined />, roles: ['ADMIN'] },
+  { key: '/bundles', label: 'Bundles', icon: <BlockOutlined />, roles: ['ADMIN'] },
   { key: '/audit', label: 'Audit', icon: <SafetyCertificateOutlined />, roles: ['ADMIN'] },
   { key: '/settings', label: 'Settings', icon: <SettingOutlined />, roles: ['ADMIN'] },
 ];
