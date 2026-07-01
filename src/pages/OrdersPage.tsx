@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Button,
@@ -75,6 +76,17 @@ export function OrdersPage() {
   const [creating, setCreating] = useState(false);
   const { data, isLoading } = useOrders({ page, limit: 10, status });
   const updateStatus = useUpdateOrderStatus();
+
+  // Open an order directly from a deep link (e.g. header global search).
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const orderId = searchParams.get('order');
+    if (orderId) {
+      setSelected(orderId);
+      searchParams.delete('order');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const columns: ColumnsType<Order> = [
     {

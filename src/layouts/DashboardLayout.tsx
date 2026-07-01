@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Avatar, Badge, Button, Dropdown, Layout, Menu, Tag, Typography } from 'antd';
 import dayjs from 'dayjs';
+import { GlobalSearch } from '../components/GlobalSearch';
 import {
   AppstoreOutlined,
   BellOutlined,
@@ -231,6 +232,7 @@ export function DashboardLayout() {
           <Typography.Text style={{ fontSize: 17, fontWeight: 700 }}>{currentTitle}</Typography.Text>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <GlobalSearch />
           <NotificationsBell />
           <Dropdown
             menu={{
