@@ -31,6 +31,8 @@ import {
   winbackCustomer,
 } from '../api/customers.api';
 import { addActivity, fetchActivities } from '../api/crm.api';
+import { useClearAllCarts } from '../api/cart.api';
+import { useAuthStore } from '../store/auth.store';
 import { formatPaise } from '../lib/money';
 import { StatusPill } from '../components/StatusPill';
 import type { Customer, CustomerSegment, CustomerStatus } from '../types';
@@ -57,11 +59,22 @@ interface CreditForm {
 
 export function CustomersPage() {
   const qc = useQueryClient();
+  const isAdmin = useAuthStore((s) => s.user?.role === 'ADMIN');
+  const clearAllCarts = useClearAllCarts();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<CustomerStatus | undefined>(undefined);
   const [notesFor, setNotesFor] = useState<Customer | null>(null);
   const [insightsFor, setInsightsFor] = useState<Customer | null>(null);
+
+  const onClearAllCarts = async () => {
+    try {
+      const removed = await clearAllCarts.mutateAsync();
+      message.success(`Cleared all carts — ${removed} line${removed === 1 ? '' : 's'} removed`);
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed to clear carts');
+    }
+  };
   const { data, isLoading } = useCustomers({
     page,
     limit: 10,
@@ -215,6 +228,17 @@ export function CustomersPage() {
       title="Customers"
       extra={
         <Space>
+          {isAdmin && (
+            <Popconfirm
+              title="Clear every customer's cart?"
+              description="Removes all items from all carts. This cannot be undone."
+              okText="Clear all carts"
+              okButtonProps={{ danger: true, loading: clearAllCarts.isPending }}
+              onConfirm={onClearAllCarts}
+            >
+              <Button danger>Clear all carts</Button>
+            </Popconfirm>
+          )}
           <Radio.Group
             value={status ?? 'ALL'}
             onChange={(e) => {
