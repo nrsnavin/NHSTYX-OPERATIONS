@@ -28,6 +28,7 @@ import {
   createOrderForCustomer,
   openInvoice,
   useBookShipment,
+  useBulkOrderStatus,
   useCancelOrder,
   useDeliverOrder,
   useOrder,
@@ -69,13 +70,36 @@ const PAYMENT_COLORS: Record<OrderPaymentStatus, string> = {
   REFUNDED: 'default',
 };
 
+// Bulk changes are fulfilment-only — cancels/returns go through their own flows.
+const BULK_STATUS_OPTIONS: OrderStatus[] = STATUS_OPTIONS.filter(
+  (s) => s !== 'CANCELLED' && s !== 'RETURNED',
+);
+
 export function OrdersPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<OrderStatus | undefined>(undefined);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  const [bulkTarget, setBulkTarget] = useState<OrderStatus | undefined>(undefined);
   const { data, isLoading } = useOrders({ page, limit: 10, status });
   const updateStatus = useUpdateOrderStatus();
+  const bulkStatus = useBulkOrderStatus();
+
+  const applyBulk = async () => {
+    if (!bulkTarget || selectedKeys.length === 0) return;
+    try {
+      const res = await bulkStatus.mutateAsync({ ids: selectedKeys, status: bulkTarget });
+      message.success(
+        `Updated ${res.updated} order(s) to ${bulkTarget}` +
+          (res.updated < res.matched ? ` · ${res.matched - res.updated} skipped` : ''),
+      );
+      setSelectedKeys([]);
+      setBulkTarget(undefined);
+    } catch (e) {
+      message.error((e as Error).message ?? 'Bulk update failed');
+    }
+  };
 
   // Open an order directly from a deep link (e.g. header global search).
   const [searchParams, setSearchParams] = useSearchParams();
@@ -219,11 +243,52 @@ export function OrdersPage() {
           </Button>
         ))}
       </Space>
+      {selectedKeys.length > 0 && (
+        <Space
+          wrap
+          style={{
+            marginBottom: 12,
+            padding: '8px 12px',
+            background: '#f5f7fa',
+            borderRadius: 8,
+          }}
+        >
+          <Typography.Text strong>{selectedKeys.length} selected</Typography.Text>
+          <Select<OrderStatus>
+            placeholder="Set status…"
+            style={{ width: 160 }}
+            value={bulkTarget}
+            onChange={setBulkTarget}
+            options={BULK_STATUS_OPTIONS.map((s) => ({
+              value: s,
+              label: <Tag color={STATUS_COLORS[s]}>{s}</Tag>,
+            }))}
+          />
+          <Popconfirm
+            title={`Set ${selectedKeys.length} order(s) to ${bulkTarget ?? '…'}?`}
+            disabled={!bulkTarget}
+            onConfirm={applyBulk}
+            okText="Apply"
+          >
+            <Button type="primary" disabled={!bulkTarget} loading={bulkStatus.isPending}>
+              Apply
+            </Button>
+          </Popconfirm>
+          <Button type="text" onClick={() => setSelectedKeys([])}>
+            Clear
+          </Button>
+        </Space>
+      )}
       <Table<Order>
         rowKey="id"
         loading={isLoading}
         columns={columns}
         dataSource={data?.items ?? []}
+        rowSelection={{
+          selectedRowKeys: selectedKeys,
+          onChange: (keys) => setSelectedKeys(keys as string[]),
+          preserveSelectedRowKeys: true,
+        }}
         pagination={{
           current: page,
           pageSize: 10,

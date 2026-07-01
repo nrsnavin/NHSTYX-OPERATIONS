@@ -29,6 +29,20 @@ export function useUpdateOrderStatus() {
   });
 }
 
+/** Applies a fulfilment status to many orders at once. */
+export function useBulkOrderStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { ids: string[]; status: OrderStatus }) => {
+      const { data } = await api.post<
+        ApiEnvelope<{ requested: number; matched: number; updated: number }>
+      >('/orders/bulk-status', input);
+      return data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['orders'] }),
+  });
+}
+
 export interface ShipInput {
   id: string;
   courierName?: string;
