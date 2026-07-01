@@ -146,6 +146,32 @@ export async function stockTake(
   return data.data;
 }
 
+export interface TransferStockInput {
+  toStoreId: string;
+  productId: string;
+  quantity: number;
+  reason?: string;
+}
+
+export interface TransferStockResult {
+  quantity: number;
+  productName: string;
+  createdDestination: boolean;
+  from: { storeId: string; name: string; stockQty: number };
+  to: { storeId: string; name: string; stockQty: number };
+}
+
+export async function transferStock(
+  fromStoreId: string,
+  input: TransferStockInput,
+): Promise<TransferStockResult> {
+  const { data } = await api.post<ApiEnvelope<TransferStockResult>>(
+    `/stores/${fromStoreId}/transfer`,
+    input,
+  );
+  return data.data;
+}
+
 export interface ImportResult {
   created: number;
   updated: number;

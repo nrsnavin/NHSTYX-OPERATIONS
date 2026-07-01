@@ -39,6 +39,7 @@ import {
   removeServiceArea,
   removeStoreProduct,
   stockTake,
+  transferStock,
   unassignAgent,
   updateStore,
   upsertStoreProduct,
@@ -267,7 +268,7 @@ function ManageStoreDrawer({
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <ServiceAreasCard store={store} isAdmin={isAdmin} onChanged={onChanged} />
         <AgentsCard store={store} isAdmin={isAdmin} onChanged={onChanged} />
-        <InventoryCard store={store} onChanged={onChanged} />
+        <InventoryCard store={store} isAdmin={isAdmin} onChanged={onChanged} />
         <StockLedgerCard store={store} />
       </Space>
     </Drawer>
@@ -445,7 +446,15 @@ function DiscountHint({ form }: { form: FormInstance<InvFormValues> }) {
   );
 }
 
-function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => void }) {
+function InventoryCard({
+  store,
+  isAdmin,
+  onChanged,
+}: {
+  store: Store;
+  isAdmin: boolean;
+  onChanged: () => void;
+}) {
   const qc = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -453,6 +462,7 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
 
   const [editing, setEditing] = useState<StoreInventoryItem | null>(null);
   const [adjusting, setAdjusting] = useState<StoreInventoryItem | null>(null);
+  const [transferring, setTransferring] = useState<StoreInventoryItem | null>(null);
   const [takeOpen, setTakeOpen] = useState(false);
   const [form] = Form.useForm<InvFormValues>();
 
@@ -574,6 +584,11 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
           {r.stocked && r.storeProduct?.isActive && (
             <Button size="small" type="link" onClick={() => setAdjusting(r)}>
               Adjust
+            </Button>
+          )}
+          {isAdmin && r.stocked && r.storeProduct?.isActive && r.storeProduct.stockQty > 0 && (
+            <Button size="small" type="link" onClick={() => setTransferring(r)}>
+              Transfer
             </Button>
           )}
           {r.stocked && (
@@ -742,6 +757,12 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
         onClose={() => setAdjusting(null)}
         onDone={refresh}
       />
+      <TransferStockModal
+        store={store}
+        item={transferring}
+        onClose={() => setTransferring(null)}
+        onDone={refresh}
+      />
       <StockTakeModal
         store={store}
         open={takeOpen}
@@ -749,6 +770,99 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
         onDone={refresh}
       />
     </Card>
+  );
+}
+
+interface TransferFormValues {
+  toStoreId: string;
+  quantity: number;
+  reason?: string;
+}
+
+/** Move a product's stock from this store to another (admin). */
+function TransferStockModal({
+  store,
+  item,
+  onClose,
+  onDone,
+}: {
+  store: Store;
+  item: StoreInventoryItem | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const { data: stores } = useStores();
+  const [form] = Form.useForm<TransferFormValues>();
+  const [saving, setSaving] = useState(false);
+  const available = item?.storeProduct?.stockQty ?? 0;
+  const destinations = (stores ?? []).filter((s) => s.id !== store.id);
+
+  const submit = async () => {
+    if (!item) return;
+    const v = await form.validateFields();
+    setSaving(true);
+    try {
+      const res = await transferStock(store.id, {
+        toStoreId: v.toStoreId,
+        productId: item.productId,
+        quantity: v.quantity,
+        reason: v.reason?.trim() || undefined,
+      });
+      message.success(
+        `Moved ${res.quantity} × ${res.productName} to ${res.to.name}` +
+          (res.createdDestination ? ' (added to that store)' : ''),
+      );
+      onClose();
+      onDone();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Transfer failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={item ? `Transfer stock — ${item.name}` : ''}
+      open={Boolean(item)}
+      onOk={submit}
+      confirmLoading={saving}
+      onCancel={onClose}
+      okText="Transfer"
+      afterOpenChange={(o) => {
+        if (o) form.setFieldsValue({ toStoreId: undefined as unknown as string, quantity: 1, reason: undefined });
+      }}
+      destroyOnClose
+    >
+      <Typography.Paragraph type="secondary">
+        {available} in stock at {store.name}.
+      </Typography.Paragraph>
+      <Form form={form} layout="vertical" requiredMark="optional">
+        <Form.Item name="toStoreId" label="Destination store" rules={[{ required: true, message: 'Pick a store' }]}>
+          <Select
+            placeholder="Move stock to…"
+            options={destinations.map((s) => ({ value: s.id, label: `${s.name} · ${s.city}` }))}
+            notFoundContent="No other stores"
+          />
+        </Form.Item>
+        <Form.Item
+          name="quantity"
+          label="Quantity"
+          rules={[
+            { required: true, type: 'number', min: 1 },
+            { type: 'number', max: available, message: `Only ${available} available` },
+          ]}
+        >
+          <InputNumber min={1} max={available} style={{ width: 180 }} autoFocus />
+        </Form.Item>
+        <Form.Item name="reason" label="Reason">
+          <Input placeholder="e.g. Rebalancing stock" maxLength={200} />
+        </Form.Item>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          If the destination doesn't stock this product, it's added there at this store's price.
+        </Typography.Text>
+      </Form>
+    </Modal>
   );
 }
 
