@@ -101,6 +101,51 @@ export async function removeStoreProduct(storeId: string, productId: string) {
   await api.delete(`/stores/${storeId}/inventory/${productId}`);
 }
 
+// ---- Stock adjustments & stock-take ----
+
+export interface AdjustStockInput {
+  mode: 'delta' | 'set';
+  quantity: number;
+  reason?: string;
+}
+
+export interface AdjustStockResult {
+  before: number;
+  after: number;
+  delta: number;
+}
+
+export async function adjustStock(
+  storeId: string,
+  productId: string,
+  input: AdjustStockInput,
+): Promise<AdjustStockResult> {
+  const { data } = await api.post<ApiEnvelope<AdjustStockResult>>(
+    `/stores/${storeId}/inventory/${productId}/adjust`,
+    input,
+  );
+  return data.data;
+}
+
+export interface StockTakeResult {
+  adjusted: number;
+  unchanged: number;
+  skipped: string[];
+  lines: { productId: string; name: string; before: number; after: number; delta: number }[];
+}
+
+export async function stockTake(
+  storeId: string,
+  counts: { productId: string; countedQty: number }[],
+  reason?: string,
+): Promise<StockTakeResult> {
+  const { data } = await api.post<ApiEnvelope<StockTakeResult>>(`/stores/${storeId}/stock-take`, {
+    counts,
+    reason,
+  });
+  return data.data;
+}
+
 export interface ImportResult {
   created: number;
   updated: number;

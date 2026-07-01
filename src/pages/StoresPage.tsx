@@ -9,8 +9,10 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Radio,
   Select,
   Space,
+  Statistic,
   Switch,
   Table,
   Tag,
@@ -30,11 +32,13 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import {
   addServiceArea,
+  adjustStock,
   assignAgent,
   createStore,
   importInventory,
   removeServiceArea,
   removeStoreProduct,
+  stockTake,
   unassignAgent,
   updateStore,
   upsertStoreProduct,
@@ -448,10 +452,13 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
   const { data, isLoading } = useStoreInventory(store.id, { page, limit: 8, search: search || undefined });
 
   const [editing, setEditing] = useState<StoreInventoryItem | null>(null);
+  const [adjusting, setAdjusting] = useState<StoreInventoryItem | null>(null);
+  const [takeOpen, setTakeOpen] = useState(false);
   const [form] = Form.useForm<InvFormValues>();
 
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ['store-inventory', store.id] });
+    qc.invalidateQueries({ queryKey: ['store-movements', store.id] });
     qc.invalidateQueries({ queryKey: ['stores'] });
     onChanged();
   };
@@ -564,6 +571,11 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
           <Button size="small" type="link" onClick={() => openEdit(r)}>
             {r.stocked ? 'Edit' : 'Add'}
           </Button>
+          {r.stocked && r.storeProduct?.isActive && (
+            <Button size="small" type="link" onClick={() => setAdjusting(r)}>
+              Adjust
+            </Button>
+          )}
           {r.stocked && (
             <Popconfirm
               title="Remove from this store?"
@@ -622,6 +634,9 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
               Import CSV
             </Button>
           </Upload>
+          <Button size="small" onClick={() => setTakeOpen(true)}>
+            Stock take
+          </Button>
           <Input.Search
             placeholder="Search products…"
             allowClear
@@ -720,7 +735,245 @@ function InventoryCard({ store, onChanged }: { store: Store; onChanged: () => vo
           </Form.List>
         </Form>
       </Modal>
+
+      <AdjustStockModal
+        store={store}
+        item={adjusting}
+        onClose={() => setAdjusting(null)}
+        onDone={refresh}
+      />
+      <StockTakeModal
+        store={store}
+        open={takeOpen}
+        onClose={() => setTakeOpen(false)}
+        onDone={refresh}
+      />
     </Card>
+  );
+}
+
+interface AdjustFormValues {
+  action: 'add' | 'remove' | 'set';
+  quantity: number;
+  reason?: string;
+}
+
+/** Single-product stock correction (add / remove / set) with a ledger reason. */
+function AdjustStockModal({
+  store,
+  item,
+  onClose,
+  onDone,
+}: {
+  store: Store;
+  item: StoreInventoryItem | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [form] = Form.useForm<AdjustFormValues>();
+  const [saving, setSaving] = useState(false);
+  const current = item?.storeProduct?.stockQty ?? 0;
+  const action = Form.useWatch('action', form) ?? 'add';
+  const quantity = Form.useWatch('quantity', form) ?? 0;
+  const projected =
+    action === 'set' ? quantity : action === 'remove' ? current - quantity : current + quantity;
+
+  const submit = async () => {
+    if (!item) return;
+    const v = await form.validateFields();
+    const mode = v.action === 'set' ? 'set' : 'delta';
+    const signed = v.action === 'remove' ? -v.quantity : v.quantity;
+    setSaving(true);
+    try {
+      const res = await adjustStock(store.id, item.productId, {
+        mode,
+        quantity: mode === 'set' ? v.quantity : signed,
+        reason: v.reason?.trim() || undefined,
+      });
+      message.success(
+        res.delta === 0
+          ? 'No change — stock already matched'
+          : `${item.name}: ${res.before} → ${res.after} (${res.delta > 0 ? '+' : ''}${res.delta})`,
+      );
+      onClose();
+      onDone();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Adjustment failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      title={item ? `Adjust stock — ${item.name}` : ''}
+      open={Boolean(item)}
+      onOk={submit}
+      confirmLoading={saving}
+      onCancel={onClose}
+      okText="Apply adjustment"
+      afterOpenChange={(o) => {
+        if (o) form.setFieldsValue({ action: 'add', quantity: 1, reason: undefined });
+      }}
+      destroyOnClose
+    >
+      <Space size="large" style={{ marginBottom: 12 }}>
+        <Statistic title="Current stock" value={current} />
+        <Statistic
+          title="After adjustment"
+          value={projected}
+          valueStyle={{ color: projected < 0 ? '#cf1322' : projected !== current ? '#3f8600' : undefined }}
+        />
+      </Space>
+      <Form form={form} layout="vertical" requiredMark={false}>
+        <Form.Item name="action" initialValue="add">
+          <Radio.Group
+            optionType="button"
+            buttonStyle="solid"
+            options={[
+              { label: 'Add', value: 'add' },
+              { label: 'Remove', value: 'remove' },
+              { label: 'Set to', value: 'set' },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item
+          name="quantity"
+          label={action === 'set' ? 'New counted quantity' : 'Quantity'}
+          rules={[{ required: true, type: 'number', min: action === 'set' ? 0 : 1 }]}
+        >
+          <InputNumber min={0} style={{ width: 180 }} autoFocus />
+        </Form.Item>
+        <Form.Item
+          name="reason"
+          label="Reason"
+          tooltip="Recorded on the stock ledger (e.g. damaged, shrinkage, found stock, count correction)"
+        >
+          <Input placeholder="e.g. Damaged in storage" maxLength={200} />
+        </Form.Item>
+        {projected < 0 && (
+          <Typography.Text type="danger">Stock can't go below zero.</Typography.Text>
+        )}
+      </Form>
+    </Modal>
+  );
+}
+
+interface CountRow {
+  productId: string;
+  name: string;
+  system: number;
+  counted: number;
+}
+
+/** Bulk physical count — enter counted quantities; differences post as ADJUSTMENTs. */
+function StockTakeModal({
+  store,
+  open,
+  onClose,
+  onDone,
+}: {
+  store: Store;
+  open: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const { data, isLoading } = useStoreInventory(open ? store.id : null, { limit: 100, search: search || undefined });
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [saving, setSaving] = useState(false);
+
+  const rows: CountRow[] = (data?.items ?? [])
+    .filter((i) => i.stocked && i.storeProduct?.isActive)
+    .map((i) => {
+      const system = i.storeProduct?.stockQty ?? 0;
+      return { productId: i.productId, name: i.name, system, counted: counts[i.productId] ?? system };
+    });
+  const changed = rows.filter((r) => r.counted !== r.system);
+
+  const submit = async () => {
+    if (changed.length === 0) {
+      message.info('No differences to record');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await stockTake(
+        store.id,
+        changed.map((r) => ({ productId: r.productId, countedQty: r.counted })),
+      );
+      message.success(`Stock take complete — ${res.adjusted} product(s) adjusted`);
+      setCounts({});
+      onClose();
+      onDone();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Stock take failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const columns: ColumnsType<CountRow> = [
+    { title: 'Product', dataIndex: 'name', key: 'name' },
+    { title: 'System', dataIndex: 'system', key: 'system', width: 90 },
+    {
+      title: 'Counted',
+      key: 'counted',
+      width: 120,
+      render: (_, r) => (
+        <InputNumber
+          min={0}
+          value={r.counted}
+          onChange={(v) => setCounts((c) => ({ ...c, [r.productId]: Number(v ?? 0) }))}
+          style={{ width: 100 }}
+        />
+      ),
+    },
+    {
+      title: 'Δ',
+      key: 'delta',
+      width: 80,
+      render: (_, r) => {
+        const d = r.counted - r.system;
+        return d === 0 ? (
+          <Typography.Text type="secondary">—</Typography.Text>
+        ) : (
+          <Tag color={d < 0 ? 'red' : 'green'}>{d > 0 ? `+${d}` : d}</Tag>
+        );
+      },
+    },
+  ];
+
+  return (
+    <Modal
+      title={`Stock take — ${store.name}`}
+      open={open}
+      onOk={submit}
+      confirmLoading={saving}
+      onCancel={onClose}
+      okText={changed.length ? `Record ${changed.length} change(s)` : 'Record'}
+      okButtonProps={{ disabled: changed.length === 0 }}
+      width={640}
+      destroyOnClose
+    >
+      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+        <Input.Search placeholder="Search products…" allowClear onSearch={setSearch} />
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          Enter the physical count for each product. Only products whose count differs are recorded
+          as adjustments on the ledger.
+        </Typography.Text>
+        <Table<CountRow>
+          rowKey="productId"
+          size="small"
+          loading={isLoading}
+          columns={columns}
+          dataSource={rows}
+          locale={{ emptyText: <Empty description="No stocked products" /> }}
+          pagination={false}
+          scroll={{ y: 360 }}
+        />
+      </Space>
+    </Modal>
   );
 }
 
