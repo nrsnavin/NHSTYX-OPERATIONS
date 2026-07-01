@@ -65,6 +65,19 @@ export function useBookShipment() {
   });
 }
 
+/** Cancels an order: restocks items and refunds any captured payment. */
+export function useCancelOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      api.post(`/orders/${id}/cancel`, { reason }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['order', v.id] });
+    },
+  });
+}
+
 /** Marks an order delivered. */
 export function useDeliverOrder() {
   const qc = useQueryClient();

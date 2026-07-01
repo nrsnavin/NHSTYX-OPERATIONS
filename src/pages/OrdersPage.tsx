@@ -27,6 +27,7 @@ import {
   createOrderForCustomer,
   openInvoice,
   useBookShipment,
+  useCancelOrder,
   useDeliverOrder,
   useOrder,
   useOrders,
@@ -364,7 +365,9 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
   const shipOrder = useShipOrder();
   const bookShipment = useBookShipment();
   const deliverOrder = useDeliverOrder();
+  const cancelOrder = useCancelOrder();
   const [shipOpen, setShipOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   const markDelivered = async () => {
     if (!order) return;
@@ -373,6 +376,25 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
       message.success('Marked delivered');
     } catch (e) {
       message.error((e as Error).message ?? 'Failed');
+    }
+  };
+
+  const cancel = async () => {
+    if (!order) return;
+    try {
+      const { data } = await cancelOrder.mutateAsync({
+        id: order.id,
+        reason: cancelReason.trim() || undefined,
+      });
+      const refunded = (data as { data?: { refundedPaise?: number } })?.data?.refundedPaise ?? 0;
+      message.success(
+        refunded > 0
+          ? `Order cancelled — items restocked, ${formatPaise(refunded)} refunded`
+          : 'Order cancelled — items restocked',
+      );
+      setCancelReason('');
+    } catch (e) {
+      message.error((e as Error).message ?? 'Failed to cancel order');
     }
   };
 
@@ -404,6 +426,8 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
 
   const bankPayment = order?.payments?.find((p) => p.method === 'BANK_TRANSFER');
   const isPendingVerify = order?.status === 'PENDING';
+  const canCancel =
+    order != null && !['DELIVERED', 'CANCELLED', 'RETURNED'].includes(order.status);
 
   return (
     <Drawer
@@ -585,6 +609,44 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 Process refunds from the Returns page.
               </Typography.Text>
+            </>
+          )}
+
+          {canCancel && (
+            <>
+              <Divider style={{ margin: '4px 0' }}>Danger zone</Divider>
+              <Popconfirm
+                title="Cancel this order?"
+                description={
+                  <Space direction="vertical" size={4} style={{ maxWidth: 280 }}>
+                    <Typography.Text>
+                      Items are restocked and any captured online payment is refunded via Razorpay.
+                      This cannot be undone.
+                    </Typography.Text>
+                    <Input.TextArea
+                      rows={2}
+                      placeholder="Reason (optional)"
+                      value={cancelReason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                    />
+                  </Space>
+                }
+                okText="Cancel order"
+                okButtonProps={{ danger: true, loading: cancelOrder.isPending }}
+                cancelText="Keep order"
+                onConfirm={cancel}
+              >
+                <Button danger block>
+                  Cancel order
+                </Button>
+              </Popconfirm>
+              {order.paymentStatus === 'PAID' && (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  {order.paymentMethod === 'RAZORPAY'
+                    ? 'Paid online — the refund is issued automatically to the customer.'
+                    : 'Marked paid — refund the customer manually; the order is set to REFUNDED.'}
+                </Typography.Text>
+              )}
             </>
           )}
         </Space>
