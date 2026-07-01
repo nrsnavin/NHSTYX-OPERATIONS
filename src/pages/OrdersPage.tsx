@@ -26,6 +26,7 @@ import dayjs from 'dayjs';
 import {
   createOrderForCustomer,
   openInvoice,
+  useBookShipment,
   useDeliverOrder,
   useOrder,
   useOrders,
@@ -361,6 +362,7 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
   const updateStatus = useUpdateOrderStatus();
   const recordPayment = useRecordPayment();
   const shipOrder = useShipOrder();
+  const bookShipment = useBookShipment();
   const deliverOrder = useDeliverOrder();
   const [shipOpen, setShipOpen] = useState(false);
 
@@ -587,7 +589,7 @@ function OrderDrawer({ id, onClose }: { id: string | null; onClose: () => void }
           )}
         </Space>
       )}
-      <ShipModal open={shipOpen} order={order ?? null} ship={shipOrder} onClose={() => setShipOpen(false)} />
+      <ShipModal open={shipOpen} order={order ?? null} ship={shipOrder} book={bookShipment} onClose={() => setShipOpen(false)} />
     </Drawer>
   );
 }
@@ -605,11 +607,13 @@ function ShipModal({
   open,
   order,
   ship,
+  book,
   onClose,
 }: {
   open: boolean;
   order: Order | null;
   ship: ReturnType<typeof useShipOrder>;
+  book: ReturnType<typeof useBookShipment>;
   onClose: () => void;
 }) {
   const [form] = Form.useForm();
@@ -630,15 +634,35 @@ function ShipModal({
       message.error((e as Error).message ?? 'Failed to record shipment');
     }
   };
+  const autoBook = async () => {
+    try {
+      const res = await book.mutateAsync(order.id);
+      message.success(
+        `Booked with ${res.order.courierName ?? 'courier'} · AWB ${res.order.trackingNumber}`,
+      );
+      if (res.labelUrl) window.open(res.labelUrl, '_blank', 'noopener');
+      onClose();
+    } catch (e) {
+      message.error((e as Error).message ?? 'Courier booking failed');
+    }
+  };
   return (
     <Modal
       title={`Ship ${order.orderNumber}`}
       open={open}
-      onOk={submit}
-      confirmLoading={ship.isPending}
       onCancel={onClose}
-      okText="Mark shipped"
       destroyOnClose
+      footer={[
+        <Button key="cancel" onClick={onClose}>
+          Cancel
+        </Button>,
+        <Button key="book" onClick={autoBook} loading={book.isPending}>
+          Book with courier
+        </Button>,
+        <Button key="ship" type="primary" onClick={submit} loading={ship.isPending}>
+          Mark shipped
+        </Button>,
+      ]}
     >
       <Form
         form={form}
@@ -659,6 +683,10 @@ function ShipModal({
           <Input placeholder="https://…" />
         </Form.Item>
       </Form>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        “Book with courier” auto-generates the AWB via your courier integration; otherwise fill the
+        fields and Mark shipped.
+      </Typography.Text>
     </Modal>
   );
 }

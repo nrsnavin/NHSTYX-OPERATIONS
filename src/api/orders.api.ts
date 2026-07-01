@@ -48,6 +48,23 @@ export function useShipOrder() {
   });
 }
 
+/** Auto-books a shipment with the configured courier → SHIPPED. */
+export function useBookShipment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await api.post<ApiEnvelope<{ order: Order; labelUrl: string | null }>>(
+        `/orders/${id}/book-shipment`,
+      );
+      return data.data;
+    },
+    onSuccess: (_d, id) => {
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['order', id] });
+    },
+  });
+}
+
 /** Marks an order delivered. */
 export function useDeliverOrder() {
   const qc = useQueryClient();
