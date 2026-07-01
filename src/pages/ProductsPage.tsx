@@ -36,6 +36,7 @@ import {
 } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
 import { formatPaise } from '../lib/money';
+import { imageSrc } from '../lib/img';
 import { StatusPill } from '../components/StatusPill';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -273,7 +274,7 @@ export function ProductsPage() {
             }}
           >
             {p.imageUrl ? (
-              <img src={p.imageUrl} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src={imageSrc(p.imageUrl)} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               <span style={{ fontSize: 40, color: '#c8ccd4', fontWeight: 800 }}>{p.name[0]}</span>
             )}
@@ -321,7 +322,7 @@ export function ProductsPage() {
       key: 'name',
       render: (_, p) => (
         <Space>
-          <Avatar shape="square" size={40} src={p.imageUrl || undefined}>
+          <Avatar shape="square" size={40} src={imageSrc(p.imageUrl)}>
             {p.name[0]}
           </Avatar>
           <div>
@@ -519,7 +520,7 @@ export function ProductsPage() {
               {() => {
                 const url = form.getFieldValue('imageUrl');
                 return url ? (
-                  <Avatar shape="square" size={64} src={url} style={{ marginTop: 8 }} />
+                  <Avatar shape="square" size={64} src={imageSrc(url)} style={{ marginTop: 8 }} />
                 ) : null;
               }}
             </Form.Item>
